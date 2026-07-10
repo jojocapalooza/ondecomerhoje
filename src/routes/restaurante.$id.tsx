@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useFavorites } from "@/lib/favorites";
-import { formatReviews, priceLabel, ratingColor, restaurants } from "@/lib/restaurants";
+import { formatReviews, priceLabel, ratingColor, restaurants, type Restaurant } from "@/lib/restaurants";
 
 export const Route = createFileRoute("/restaurante/$id")({
   loader: ({ params }) => {
@@ -43,7 +43,7 @@ function NotFoundRestaurant() {
 }
 
 function Detail() {
-  const { r } = Route.useLoaderData();
+  const { r } = Route.useLoaderData() as { r: Restaurant };
   const { has, toggle } = useFavorites();
   const fav = has(r.id);
 

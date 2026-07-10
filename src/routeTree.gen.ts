@@ -13,6 +13,7 @@ import { Route as TrendRouteImport } from './routes/trend'
 import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as FavoritosRouteImport } from './routes/favoritos'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as RestauranteIdRouteImport } from './routes/restaurante.$id'
 
 const TrendRoute = TrendRouteImport.update({
   id: '/trend',
@@ -34,18 +35,25 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RestauranteIdRoute = RestauranteIdRouteImport.update({
+  id: '/restaurante/$id',
+  path: '/restaurante/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/favoritos': typeof FavoritosRoute
   '/perfil': typeof PerfilRoute
   '/trend': typeof TrendRoute
+  '/restaurante/$id': typeof RestauranteIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/favoritos': typeof FavoritosRoute
   '/perfil': typeof PerfilRoute
   '/trend': typeof TrendRoute
+  '/restaurante/$id': typeof RestauranteIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,20 @@ export interface FileRoutesById {
   '/favoritos': typeof FavoritosRoute
   '/perfil': typeof PerfilRoute
   '/trend': typeof TrendRoute
+  '/restaurante/$id': typeof RestauranteIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/favoritos' | '/perfil' | '/trend'
+  fullPaths: '/' | '/favoritos' | '/perfil' | '/trend' | '/restaurante/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/favoritos' | '/perfil' | '/trend'
-  id: '__root__' | '/' | '/favoritos' | '/perfil' | '/trend'
+  to: '/' | '/favoritos' | '/perfil' | '/trend' | '/restaurante/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/favoritos'
+    | '/perfil'
+    | '/trend'
+    | '/restaurante/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +82,7 @@ export interface RootRouteChildren {
   FavoritosRoute: typeof FavoritosRoute
   PerfilRoute: typeof PerfilRoute
   TrendRoute: typeof TrendRoute
+  RestauranteIdRoute: typeof RestauranteIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +115,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/restaurante/$id': {
+      id: '/restaurante/$id'
+      path: '/restaurante/$id'
+      fullPath: '/restaurante/$id'
+      preLoaderRoute: typeof RestauranteIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +130,7 @@ const rootRouteChildren: RootRouteChildren = {
   FavoritosRoute: FavoritosRoute,
   PerfilRoute: PerfilRoute,
   TrendRoute: TrendRoute,
+  RestauranteIdRoute: RestauranteIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
