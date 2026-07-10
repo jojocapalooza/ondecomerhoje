@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrendRouteImport } from './routes/trend'
+import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as FavoritosRouteImport } from './routes/favoritos'
 import { Route as IndexRouteImport } from './routes/index'
 
 const TrendRoute = TrendRouteImport.update({
   id: '/trend',
   path: '/trend',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PerfilRoute = PerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FavoritosRoute = FavoritosRouteImport.update({
@@ -32,30 +38,34 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/favoritos': typeof FavoritosRoute
+  '/perfil': typeof PerfilRoute
   '/trend': typeof TrendRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/favoritos': typeof FavoritosRoute
+  '/perfil': typeof PerfilRoute
   '/trend': typeof TrendRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/favoritos': typeof FavoritosRoute
+  '/perfil': typeof PerfilRoute
   '/trend': typeof TrendRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/favoritos' | '/trend'
+  fullPaths: '/' | '/favoritos' | '/perfil' | '/trend'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/favoritos' | '/trend'
-  id: '__root__' | '/' | '/favoritos' | '/trend'
+  to: '/' | '/favoritos' | '/perfil' | '/trend'
+  id: '__root__' | '/' | '/favoritos' | '/perfil' | '/trend'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   FavoritosRoute: typeof FavoritosRoute
+  PerfilRoute: typeof PerfilRoute
   TrendRoute: typeof TrendRoute
 }
 
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/trend'
       fullPath: '/trend'
       preLoaderRoute: typeof TrendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/perfil': {
+      id: '/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof PerfilRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/favoritos': {
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   FavoritosRoute: FavoritosRoute,
+  PerfilRoute: PerfilRoute,
   TrendRoute: TrendRoute,
 }
 export const routeTree = rootRouteImport
