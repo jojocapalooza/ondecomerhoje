@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Heart } from "lucide-react";
 import { RestaurantCard } from "@/components/RestaurantCard";
-import { useFavorites } from "@/lib/favorites";
+import { useFavorites, useUserLocation, haversineKm } from "@/lib/favorites";
 import { restaurants } from "@/lib/restaurants";
 
 export const Route = createFileRoute("/favoritos")({
@@ -16,7 +16,14 @@ export const Route = createFileRoute("/favoritos")({
 
 function Favoritos() {
   const { ids } = useFavorites();
-  const list = restaurants.filter((r) => ids.includes(r.id));
+  const loc = useUserLocation();
+  const list = restaurants
+    .filter((r) => ids.includes(r.id))
+    .map((r) => ({
+      ...r,
+      distance: loc ? +haversineKm(loc, { lat: r.latitude, lng: r.longitude }).toFixed(1) : r.distance,
+    }))
+    .sort((a, b) => a.distance - b.distance);
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
       <h1 className="text-3xl font-bold tracking-tight">Favoritos</h1>
