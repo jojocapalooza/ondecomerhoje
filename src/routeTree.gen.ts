@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrendRouteImport } from './routes/trend'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as FavoritosRouteImport } from './routes/favoritos'
 import { Route as IndexRouteImport } from './routes/index'
@@ -18,6 +19,11 @@ import { Route as RestauranteIdRouteImport } from './routes/restaurante.$id'
 const TrendRoute = TrendRouteImport.update({
   id: '/trend',
   path: '/trend',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PerfilRoute = PerfilRouteImport.update({
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/favoritos': typeof FavoritosRoute
   '/perfil': typeof PerfilRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/trend': typeof TrendRoute
   '/restaurante/$id': typeof RestauranteIdRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/favoritos': typeof FavoritosRoute
   '/perfil': typeof PerfilRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/trend': typeof TrendRoute
   '/restaurante/$id': typeof RestauranteIdRoute
 }
@@ -60,19 +68,33 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/favoritos': typeof FavoritosRoute
   '/perfil': typeof PerfilRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/trend': typeof TrendRoute
   '/restaurante/$id': typeof RestauranteIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/favoritos' | '/perfil' | '/trend' | '/restaurante/$id'
+  fullPaths:
+    | '/'
+    | '/favoritos'
+    | '/perfil'
+    | '/sitemap.xml'
+    | '/trend'
+    | '/restaurante/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/favoritos' | '/perfil' | '/trend' | '/restaurante/$id'
+  to:
+    | '/'
+    | '/favoritos'
+    | '/perfil'
+    | '/sitemap.xml'
+    | '/trend'
+    | '/restaurante/$id'
   id:
     | '__root__'
     | '/'
     | '/favoritos'
     | '/perfil'
+    | '/sitemap.xml'
     | '/trend'
     | '/restaurante/$id'
   fileRoutesById: FileRoutesById
@@ -81,6 +103,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   FavoritosRoute: typeof FavoritosRoute
   PerfilRoute: typeof PerfilRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TrendRoute: typeof TrendRoute
   RestauranteIdRoute: typeof RestauranteIdRoute
 }
@@ -92,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/trend'
       fullPath: '/trend'
       preLoaderRoute: typeof TrendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/perfil': {
@@ -129,6 +159,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   FavoritosRoute: FavoritosRoute,
   PerfilRoute: PerfilRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   TrendRoute: TrendRoute,
   RestauranteIdRoute: RestauranteIdRoute,
 }
