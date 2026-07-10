@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Filters, defaultFilters, type FilterState } from "@/components/Filters";
 import { RestaurantCard } from "@/components/RestaurantCard";
 import { restaurants } from "@/lib/restaurants";
-import { getSearchHistory, pushSearch, clearSearchHistory } from "@/lib/favorites";
+import { getSearchHistory, pushSearch, clearSearchHistory, useUserLocation, haversineKm } from "@/lib/favorites";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -26,6 +26,7 @@ function Home() {
   const [visible, setVisible] = useState(9);
   const [showAuto, setShowAuto] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const userLoc = useUserLocation();
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 300);
@@ -41,7 +42,14 @@ function Home() {
   }, [query]);
 
   const filtered = useMemo(() => {
-    let list = restaurants.filter((r) => {
+    // Distância efetiva: real a partir da geolocalização (se disponível), senão a mock.
+    const withDist = restaurants.map((r) => ({
+      ...r,
+      distance: userLoc
+        ? +haversineKm(userLoc, { lat: r.latitude, lng: r.longitude }).toFixed(1)
+        : r.distance,
+    }));
+    let list = withDist.filter((r) => {
       if (debounced && !r.name.toLowerCase().includes(debounced.toLowerCase()) && !r.cuisine.toLowerCase().includes(debounced.toLowerCase())) return false;
       if (filters.cuisines.length && !filters.cuisines.includes(r.cuisine)) return false;
       if (r.distance > filters.maxDistance) return false;
@@ -49,22 +57,33 @@ function Home() {
       if (filters.priceLevels.length && !filters.priceLevels.includes(r.priceLevel)) return false;
       return true;
     });
+    // Proximidade é sempre um fator forte, independente do filtro/aba escolhida.
+    // Cada modo mantém seu critério principal, mas a distância penaliza opções distantes.
+    const proximityPenalty = (d: number, weight: number) => d * weight;
     switch (sort) {
       case "stars":
-        list = [...list].sort((a, b) => b.rating - a.rating);
+        list = [...list].sort(
+          (a, b) => (b.rating - proximityPenalty(b.distance, 0.15)) - (a.rating - proximityPenalty(a.distance, 0.15)),
+        );
         break;
       case "best":
-        list = [...list].sort((a, b) => b.rating * Math.log(b.reviews + 1) - a.rating * Math.log(a.reviews + 1));
+        list = [...list].sort(
+          (a, b) =>
+            (b.rating * Math.log(b.reviews + 1) - proximityPenalty(b.distance, 0.4)) -
+            (a.rating * Math.log(a.reviews + 1) - proximityPenalty(a.distance, 0.4)),
+        );
         break;
       case "reviews":
-        list = [...list].sort((a, b) => b.reviews - a.reviews);
+        list = [...list].sort(
+          (a, b) => (Math.log(b.reviews + 1) - proximityPenalty(b.distance, 0.2)) - (Math.log(a.reviews + 1) - proximityPenalty(a.distance, 0.2)),
+        );
         break;
       case "near":
         list = [...list].sort((a, b) => a.distance - b.distance);
         break;
     }
     return list;
-  }, [debounced, filters, sort]);
+  }, [debounced, filters, sort, userLoc]);
 
   function startVoice() {
     const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;

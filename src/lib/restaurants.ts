@@ -21,20 +21,20 @@ export type Restaurant = {
   userReviews: { user: string; rating: number; date: string; text: string }[];
 };
 
-const photos = [
-  "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80",
-  "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&q=80",
-  "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80",
-  "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&q=80",
-  "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80",
-  "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=800&q=80",
-  "https://images.unsplash.com/photo-1590846406792-0adc7f938f1d?w=800&q=80",
-  "https://images.unsplash.com/photo-1600891964092-4316c288032e?w=800&q=80",
-  "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&q=80",
-  "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80",
-  "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80",
-  "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80",
-];
+// Fotos representativas por tipo de culinária (Unsplash)
+const cuisinePhotos: Record<string, string> = {
+  Italiana: "https://images.unsplash.com/photo-1521389508051-d7ffb5dc8d74?w=800&q=80", // massa
+  Japonesa: "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=800&q=80", // sushi
+  Brasileira: "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&q=80", // churrasco
+  Chinesa: "https://images.unsplash.com/photo-1552611052-33e04de081de?w=800&q=80", // wok
+  Mexicana: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&q=80", // tacos
+  Francesa: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80", // bistrô
+  "Árabe": "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&q=80", // kebab/grelhados
+  Vegetariana: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&q=80", // salada
+  "Hambúrguer": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&q=80", // burger
+  Pizzaria: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=80", // pizza
+};
+const fallbackPhoto = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80";
 
 export const cuisines = [
   "Italiana",
@@ -92,7 +92,7 @@ export const restaurants: Restaurant[] = names.map((name, i) => {
     address: `Rua das Flores, ${100 + i * 7} - Centro`,
     phone: `(11) 9${1000 + i}-${2000 + i}`,
     website: i % 2 === 0 ? "https://exemplo.com" : undefined,
-    photo: photos[i % photos.length],
+    photo: cuisinePhotos[cuisine] ?? fallbackPhoto,
     isNew: i % 6 === 0,
     promo: i % 5 === 0,
     hours: "Seg-Dom: 11h às 23h",

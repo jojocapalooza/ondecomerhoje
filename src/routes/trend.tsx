@@ -3,6 +3,7 @@ import { useState } from "react";
 import { MapPin } from "lucide-react";
 import { RestaurantCard } from "@/components/RestaurantCard";
 import { restaurants } from "@/lib/restaurants";
+import { useUserLocation, haversineKm } from "@/lib/favorites";
 
 const cities = ["São Paulo", "Rio de Janeiro", "Belo Horizonte"];
 
@@ -18,9 +19,19 @@ export const Route = createFileRoute("/trend")({
 
 function Trend() {
   const [city, setCity] = useState(cities[0]);
+  const loc = useUserLocation();
   const list = restaurants
     .filter((r) => r.city === city)
-    .sort((a, b) => b.rating * Math.log(b.reviews + 1) - a.rating * Math.log(a.reviews + 1));
+    .map((r) => ({
+      ...r,
+      distance: loc ? +haversineKm(loc, { lat: r.latitude, lng: r.longitude }).toFixed(1) : r.distance,
+    }))
+    // Ranking mantém rating x volume, mas penaliza distância para priorizar o mais próximo.
+    .sort(
+      (a, b) =>
+        (b.rating * Math.log(b.reviews + 1) - b.distance * 0.4) -
+        (a.rating * Math.log(a.reviews + 1) - a.distance * 0.4),
+    );
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-10">
