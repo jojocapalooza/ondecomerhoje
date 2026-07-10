@@ -80,11 +80,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Onde Comer Hoje — Descubra restaurantes perto de você" },
       { name: "description", content: "Buscador inteligente de restaurantes: descubra, filtre e salve os melhores lugares para comer hoje." },
       { name: "author", content: "Onde Comer Hoje" },
-      { property: "og:title", content: "Onde Comer Hoje" },
-      { property: "og:description", content: "Descubra, filtre e salve os melhores restaurantes perto de você." },
+      { property: "og:title", content: "Onde Comer Hoje — Descubra restaurantes perto de você" },
+      { property: "og:description", content: "Buscador inteligente de restaurantes: descubra, filtre e salve os melhores lugares para comer hoje." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Onde Comer Hoje — Descubra restaurantes perto de você" },
+      { name: "twitter:description", content: "Buscador inteligente de restaurantes: descubra, filtre e salve os melhores lugares para comer hoje." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5a171a78-7ad4-45b2-b199-548599f42ebe/id-preview-ec9be214--9426a9bb-4f7b-4286-a432-76fd41db831d.lovable.app-1783711103854.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5a171a78-7ad4-45b2-b199-548599f42ebe/id-preview-ec9be214--9426a9bb-4f7b-4286-a432-76fd41db831d.lovable.app-1783711103854.png" },
     ],
     links: [
       {
