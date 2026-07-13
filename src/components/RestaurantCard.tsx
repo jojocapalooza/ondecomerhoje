@@ -2,9 +2,22 @@ import { Link } from "@tanstack/react-router";
 import { Heart, MapPin, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useFavorites } from "@/lib/favorites";
-import { formatReviews, priceLabel, ratingColor, type Restaurant } from "@/lib/restaurants";
+import { formatReviews, priceLabel, ratingColor } from "@/lib/restaurants";
 
-export function RestaurantCard({ r }: { r: Restaurant }) {
+export type CardRestaurant = {
+  id: string;
+  name: string;
+  cuisine: string;
+  rating: number;
+  reviews: number;
+  priceLevel: 1 | 2 | 3 | 4;
+  photo: string;
+  distance: number;
+  isNew?: boolean;
+  promo?: boolean;
+};
+
+export function RestaurantCard({ r }: { r: CardRestaurant }) {
   const { has, toggle } = useFavorites();
   const fav = has(r.id);
   return (
