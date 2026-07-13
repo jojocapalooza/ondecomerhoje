@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Mic, Search, MapPin, Star, TrendingUp, Clock, Utensils } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,6 +9,12 @@ import { Filters, defaultFilters, type FilterState } from "@/components/Filters"
 import { RestaurantCard } from "@/components/RestaurantCard";
 import { restaurants } from "@/lib/restaurants";
 import { getSearchHistory, pushSearch, clearSearchHistory, useUserLocation, haversineKm } from "@/lib/favorites";
+import {
+  searchNearbyRestaurants,
+  searchRestaurantsByText,
+  reverseGeocode,
+  type NearbyRestaurant,
+} from "@/lib/google-places.functions";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -27,6 +35,54 @@ function Home() {
   const [showAuto, setShowAuto] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const userLoc = useUserLocation();
+  const fetchNearby = useServerFn(searchNearbyRestaurants);
+  const fetchText = useServerFn(searchRestaurantsByText);
+  const fetchGeo = useServerFn(reverseGeocode);
+
+  // Reverse geocode: descobre país/cidade para adaptar região
+  const geoQuery = useQuery({
+    queryKey: ["geo", userLoc?.lat, userLoc?.lng],
+    queryFn: () => fetchGeo({ data: { latitude: userLoc!.lat, longitude: userLoc!.lng } }),
+    enabled: !!userLoc,
+    staleTime: 60 * 60 * 1000,
+  });
+  const regionCode = geoQuery.data?.countryCode;
+
+  // Lista de restaurantes: por texto (quando há busca) ou por proximidade
+  const nearbyQuery = useQuery({
+    queryKey: ["nearby", userLoc?.lat, userLoc?.lng, regionCode],
+    queryFn: () =>
+      fetchNearby({
+        data: {
+          latitude: userLoc!.lat,
+          longitude: userLoc!.lng,
+          radius: 5000,
+          regionCode,
+        },
+      }),
+    enabled: !!userLoc && !debounced,
+    staleTime: 5 * 60 * 1000,
+  });
+  const textQuery = useQuery({
+    queryKey: ["places-text", debounced, userLoc?.lat, userLoc?.lng, regionCode],
+    queryFn: () =>
+      fetchText({
+        data: {
+          query: debounced,
+          latitude: userLoc?.lat,
+          longitude: userLoc?.lng,
+          regionCode,
+        },
+      }),
+    enabled: !!debounced,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const remoteList: NearbyRestaurant[] | undefined = debounced
+    ? textQuery.data
+    : nearbyQuery.data;
+  const loadingRemote = debounced ? textQuery.isLoading : nearbyQuery.isLoading;
+  const usingRemote = !!userLoc && !!remoteList;
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 300);
@@ -38,16 +94,32 @@ function Home() {
   const suggestions = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    return restaurants.filter((r) => r.name.toLowerCase().includes(q)).slice(0, 5);
-  }, [query]);
+    const src = usingRemote && remoteList ? remoteList : restaurants;
+    return src.filter((r) => r.name.toLowerCase().includes(q)).slice(0, 5);
+  }, [query, usingRemote, remoteList]);
 
   const filtered = useMemo(() => {
-    // Distância efetiva: real a partir da geolocalização (se disponível), senão a mock.
-    const withDist = restaurants.map((r) => ({
+    // Base: dados reais do Google Places (se houver geolocalização), senão fallback mock.
+    const base = usingRemote && remoteList
+      ? remoteList.map((r) => ({
+          id: r.id,
+          name: r.name,
+          cuisine: r.cuisine,
+          rating: r.rating,
+          reviews: r.reviews,
+          priceLevel: r.priceLevel,
+          photo: r.photo,
+          latitude: r.latitude,
+          longitude: r.longitude,
+          isNew: false,
+          promo: false,
+        }))
+      : restaurants;
+    const withDist = base.map((r) => ({
       ...r,
       distance: userLoc
         ? +haversineKm(userLoc, { lat: r.latitude, lng: r.longitude }).toFixed(1)
-        : r.distance,
+        : (r as { distance?: number }).distance ?? 0,
     }));
     let list = withDist.filter((r) => {
       if (debounced && !r.name.toLowerCase().includes(debounced.toLowerCase()) && !r.cuisine.toLowerCase().includes(debounced.toLowerCase())) return false;
@@ -83,7 +155,7 @@ function Home() {
         break;
     }
     return list;
-  }, [debounced, filters, sort, userLoc]);
+  }, [debounced, filters, sort, userLoc, usingRemote, remoteList]);
 
   function startVoice() {
     const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -238,8 +310,21 @@ function Home() {
               <div>
                 <h2 className="text-xl font-bold">
                   {filtered.length} {filtered.length === 1 ? "restaurante" : "restaurantes"}
+                  {usingRemote && geoQuery.data?.city && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      · próximos a {geoQuery.data.city}
+                    </span>
+                  )}
                 </h2>
-                <p className="text-sm text-muted-foreground">Encontre o próximo lugar favorito perto de você.</p>
+                <p className="text-sm text-muted-foreground">
+                  {!userLoc
+                    ? "Ative a localização para ver restaurantes reais perto de você."
+                    : loadingRemote
+                      ? "Buscando restaurantes próximos no Google Maps…"
+                      : usingRemote
+                        ? "Resultados reais do Google Maps, ordenados por proximidade."
+                        : "Mostrando prévia local — sem cobertura de dados na sua região."}
+                </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {([

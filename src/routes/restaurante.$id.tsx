@@ -1,5 +1,5 @@
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, CheckCircle2, Clock, Globe, Heart, MapPin, Phone, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -8,19 +8,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useFavorites } from "@/lib/favorites";
 import { formatReviews, priceLabel, ratingColor, restaurants, type Restaurant } from "@/lib/restaurants";
-import { getRestaurantPlace, type PlaceData } from "@/lib/google-places.functions";
+import {
+  getRestaurantPlace,
+  getPlaceDetailsById,
+  cuisinePhoto,
+  type PlaceData,
+} from "@/lib/google-places.functions";
 
-const placeQueryOptions = (r: Restaurant) =>
+const placeQueryOptions = (id: string, r?: Restaurant) =>
   queryOptions({
-    queryKey: ["place", r.id],
+    queryKey: ["place", id],
     queryFn: () =>
-      getRestaurantPlace({
-        data: {
-          query: `${r.name} ${r.city}`,
-          latitude: r.latitude,
-          longitude: r.longitude,
-        },
-      }),
+      r
+        ? getRestaurantPlace({
+            data: { query: `${r.name} ${r.city}`, latitude: r.latitude, longitude: r.longitude },
+          })
+        : getPlaceDetailsById({ data: { placeId: id } }),
     staleTime: 60 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
   });
@@ -28,12 +31,11 @@ const placeQueryOptions = (r: Restaurant) =>
 export const Route = createFileRoute("/restaurante/$id")({
   loader: async ({ params, context }) => {
     const r = restaurants.find((x) => x.id === params.id);
-    if (!r) throw notFound();
-    void context.queryClient.prefetchQuery(placeQueryOptions(r));
-    return { r };
+    void context.queryClient.prefetchQuery(placeQueryOptions(params.id, r));
+    return { id: params.id, r: r ?? null };
   },
   head: ({ loaderData }) => {
-    if (!loaderData) {
+    if (!loaderData || !loaderData.r) {
       return { meta: [{ title: "Restaurante — Onde Comer Hoje" }, { name: "robots", content: "noindex" }] };
     }
     const r = loaderData.r;
@@ -62,27 +64,33 @@ function NotFoundRestaurant() {
 }
 
 function Detail() {
-  const { r } = Route.useLoaderData() as { r: Restaurant };
+  const { id, r } = Route.useLoaderData() as { id: string; r: Restaurant | null };
   const { has, toggle } = useFavorites();
-  const fav = has(r.id);
+  const favId = r?.id ?? id;
+  const fav = has(favId);
   const fetchPlace = useServerFn(getRestaurantPlace);
+  const fetchDetails = useServerFn(getPlaceDetailsById);
   const { data: place } = useSuspenseQuery({
-    ...placeQueryOptions(r),
+    ...placeQueryOptions(id, r ?? undefined),
     queryFn: () =>
-      fetchPlace({
-        data: { query: `${r.name} ${r.city}`, latitude: r.latitude, longitude: r.longitude },
-      }),
+      r
+        ? fetchPlace({
+            data: { query: `${r.name} ${r.city}`, latitude: r.latitude, longitude: r.longitude },
+          })
+        : fetchDetails({ data: { placeId: id } }),
   });
 
-  const heroPhoto = place?.photos[0] ?? r.photo;
+  const cuisine = r?.cuisine ?? "Restaurante";
+  const heroPhoto = place?.photos[0] ?? r?.photo ?? cuisinePhoto(cuisine);
   const gallery = place?.photos.slice(1, 5) ?? [];
-  const address = place?.address ?? r.address;
-  const phone = place?.phone ?? r.phone;
-  const website = place?.website ?? r.website;
-  const rating = place?.rating ?? r.rating;
-  const reviewsCount = place?.userRatingCount ?? r.reviews;
-  const priceLvl = (place?.priceLevel ?? r.priceLevel) as 1 | 2 | 3 | 4;
-  const location = place?.location ?? { latitude: r.latitude, longitude: r.longitude };
+  const address = place?.address ?? r?.address ?? "";
+  const phone = place?.phone ?? r?.phone;
+  const website = place?.website ?? r?.website;
+  const rating = place?.rating ?? r?.rating ?? 0;
+  const reviewsCount = place?.userRatingCount ?? r?.reviews ?? 0;
+  const priceLvl = ((place?.priceLevel ?? r?.priceLevel ?? 2) as 1 | 2 | 3 | 4);
+  const displayName = place?.name ?? r?.name ?? "Restaurante";
+  const location = place?.location ?? { latitude: r?.latitude ?? 0, longitude: r?.longitude ?? 0 };
   const mapsUri =
     place?.googleMapsUri ??
     `https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}`;
@@ -91,7 +99,7 @@ function Detail() {
     <article>
       <div className="relative">
         <div className="relative h-64 md:h-96 w-full overflow-hidden bg-muted">
-          <img src={heroPhoto} alt={r.name} className="h-full w-full object-cover" />
+          <img src={heroPhoto} alt={displayName} className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
           <Link to="/" className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full bg-background/90 px-3 py-1.5 text-sm backdrop-blur hover:bg-background">
             <ArrowLeft className="h-4 w-4" /> Voltar
@@ -107,28 +115,28 @@ function Detail() {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="flex flex-wrap gap-1.5">
-                  <Badge variant="secondary">{r.cuisine}</Badge>
+                  <Badge variant="secondary">{cuisine}</Badge>
                   <Badge variant="outline">{priceLabel(priceLvl)}</Badge>
-                  {r.isNew && <Badge className="bg-primary text-primary-foreground border-0">Novo</Badge>}
-                  {r.promo && <Badge className="bg-warning text-foreground border-0">Promoção</Badge>}
+                  {r?.isNew && <Badge className="bg-primary text-primary-foreground border-0">Novo</Badge>}
+                  {r?.promo && <Badge className="bg-warning text-foreground border-0">Promoção</Badge>}
                   {place?.openNow !== undefined && (
                     <Badge className={place.openNow ? "bg-success text-white border-0" : "bg-destructive text-white border-0"}>
                       {place.openNow ? "Aberto agora" : "Fechado"}
                     </Badge>
                   )}
                 </div>
-                <h1 className="mt-2 text-3xl font-bold tracking-tight">{place?.name ?? r.name}</h1>
+                <h1 className="mt-2 text-3xl font-bold tracking-tight">{displayName}</h1>
                 <div className="mt-2 flex items-center gap-2 text-sm">
                   <Star className={`h-4 w-4 fill-current ${ratingColor(rating)}`} />
                   <span className="font-semibold">{rating.toFixed(1)}</span>
                   <span className="text-muted-foreground">· {formatReviews(reviewsCount)}</span>
                 </div>
                 <div className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground">
-                  <MapPin className="h-4 w-4" /> {address} · {r.distance} km
+                  <MapPin className="h-4 w-4" /> {address}
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="icon" onClick={() => toggle(r.id)} aria-label="Favoritar">
+                <Button variant="outline" size="icon" onClick={() => toggle(favId)} aria-label="Favoritar">
                   <Heart className={fav ? "fill-destructive text-destructive" : ""} />
                 </Button>
                 <Button asChild>
@@ -147,7 +155,7 @@ function Detail() {
           <div className="mb-8 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {gallery.map((src, i) => (
               <div key={i} className="aspect-square overflow-hidden rounded-xl bg-muted">
-                <img src={src} alt={`${r.name} - foto ${i + 2}`} loading="lazy" className="h-full w-full object-cover" />
+                <img src={src} alt={`${displayName} - foto ${i + 2}`} loading="lazy" className="h-full w-full object-cover" />
               </div>
             ))}
           </div>
@@ -156,8 +164,8 @@ function Detail() {
         <Tabs defaultValue="info">
           <TabsList className="w-full flex-wrap">
             <TabsTrigger value="info">Informações</TabsTrigger>
-            <TabsTrigger value="menu">Cardápio</TabsTrigger>
-            <TabsTrigger value="reco">Pratos recomendados</TabsTrigger>
+            {r && <TabsTrigger value="menu">Cardápio</TabsTrigger>}
+            {r && <TabsTrigger value="reco">Pratos recomendados</TabsTrigger>}
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
           </TabsList>
 
@@ -191,7 +199,7 @@ function Detail() {
             )}
           </TabsContent>
 
-          <TabsContent value="menu" className="mt-6 space-y-3">
+          {r && (<TabsContent value="menu" className="mt-6 space-y-3">
             <p className="text-sm text-muted-foreground">
               Sugestões da casa — o cardápio oficial pode ser consultado no {" "}
               {website ? (
@@ -216,9 +224,9 @@ function Detail() {
                 <div className="shrink-0 text-lg font-bold text-primary">R$ {m.price.toFixed(2)}</div>
               </div>
             ))}
-          </TabsContent>
+          </TabsContent>)}
 
-          <TabsContent value="reco" className="mt-6 space-y-3">
+          {r && (<TabsContent value="reco" className="mt-6 space-y-3">
             {r.recommended.map((p) => (
               <div key={p.name} className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-center justify-between">
@@ -232,7 +240,7 @@ function Detail() {
                 <p className="mt-1 text-sm italic text-muted-foreground">"{p.quote}"</p>
               </div>
             ))}
-          </TabsContent>
+          </TabsContent>)}
 
           <TabsContent value="reviews" className="mt-6 space-y-3">
             {place && place.reviews.length > 0 ? (
@@ -249,10 +257,12 @@ function Detail() {
                   />
                 ))}
               </>
-            ) : (
+            ) : r ? (
               r.userReviews.map((u, i) => (
                 <ReviewCard key={i} author={u.user} rating={u.rating} date={u.date} text={u.text} />
               ))
+            ) : (
+              <p className="text-sm text-muted-foreground">Sem avaliações públicas ainda.</p>
             )}
           </TabsContent>
         </Tabs>
