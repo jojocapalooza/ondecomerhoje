@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { MapPin, TrendingUp, Gem, Crown, Navigation } from "lucide-react";
+import { MapPin, Flame, Gem, Trophy, Navigation, Clock } from "lucide-react";
 import { RestaurantCard } from "@/components/RestaurantCard";
 import { useUserLocation, haversineKm } from "@/lib/favorites";
 import {
@@ -64,13 +64,56 @@ const METROPOLISES: City[] = [
   { name: "Milano", lat: 45.4642, lng: 9.19, country: "IT", population: 1370000 },
 ];
 
-type Mode = "trending" | "hidden" | "must" | "closest";
-const MODES: Array<{ id: Mode; label: string; icon: typeof TrendingUp; hint: string }> = [
-  { id: "trending", label: "Em Alta", icon: TrendingUp, hint: "reviews × rating" },
-  { id: "hidden", label: "Achadinhos", icon: Gem, hint: "gemas com poucas reviews" },
-  { id: "must", label: "Imperdíveis", icon: Crown, hint: "consagrados pela crítica" },
-  { id: "closest", label: "Mais Próximo", icon: Navigation, hint: "perto de você" },
+type Mode = "trending" | "gems" | "top" | "nearby";
+const MODES: Array<{ id: Mode; label: string; icon: typeof Flame; hint: string; emoji: string }> = [
+  { id: "trending", label: "Em Alta", icon: Flame, emoji: "🔥", hint: "no auge da popularidade" },
+  { id: "gems", label: "Achadinhos", icon: Gem, emoji: "💎", hint: "segredos dos locais" },
+  { id: "top", label: "Consagrados", icon: Trophy, emoji: "🏆", hint: "clássicos de reputação sólida" },
+  { id: "nearby", label: "Próximos", icon: Navigation, emoji: "📍", hint: "perto de você agora" },
 ];
+
+function modeDescription(mode: Mode, city?: string): string {
+  switch (mode) {
+    case "trending":
+      return `Lugares no pico de popularidade em ${city ?? "sua região"}: nota alta e volume de reviews em faixa de crescimento — nem estreantes, nem clássicos saturados.`;
+    case "gems":
+      return `Os segredos mais bem guardados de ${city ?? "sua cidade"}: notas altíssimas com público ainda enxuto, o tipo de lugar que morador local recomenda.`;
+    case "top":
+      return `Clássicos consagrados de ${city ?? "sua cidade"}: reputação sustentada com muito volume e nota consistentemente alta ao longo do tempo.`;
+    case "nearby":
+      return `Ao alcance dos seus passos agora — proximidade real, priorizando quem está aberto e o que faz sentido para o horário atual.`;
+  }
+}
+
+// Pesos contextuais por horário do dia para o modo Próximos.
+// A busca traz `cuisine` normalizado em pt-BR — usamos como proxy de intenção.
+function contextualWeight(cuisine: string, hour: number, isWeekend: boolean): number {
+  if (hour >= 5 && hour < 11) {
+    if (cuisine === "Café" || cuisine === "Padaria") return 1.6;
+    if (cuisine === "Bar") return 0.55;
+    return 1;
+  }
+  if (hour >= 11 && hour < 15) {
+    if (cuisine === "Bar") return 0.75;
+    if (cuisine === "Café" || cuisine === "Padaria") return 0.9;
+    return 1.15;
+  }
+  if (hour >= 15 && hour < 18) {
+    if (cuisine === "Café" || cuisine === "Padaria") return 1.35;
+    if (cuisine === "Bar") return 0.85;
+    return 1;
+  }
+  if (hour >= 18 && hour < 23) {
+    if (cuisine === "Bar") return isWeekend ? 1.55 : 1.25;
+    if (cuisine === "Pizzaria" || cuisine === "Hambúrguer") return 1.3;
+    if (cuisine === "Café" || cuisine === "Padaria") return 0.75;
+    return 1.15;
+  }
+  if (cuisine === "Bar") return 1.7;
+  if (cuisine === "Hambúrguer" || cuisine === "Pizzaria" || cuisine === "Fast Food") return 1.4;
+  if (cuisine === "Café" || cuisine === "Padaria") return 0.55;
+  return 0.9;
+}
 
 export const Route = createFileRoute("/trend")({
   head: () => ({
@@ -145,6 +188,7 @@ function Trend() {
 
   const city = cities.find((c) => c.name === selected) ?? cities[0];
   const [mode, setMode] = useState<Mode>("trending");
+  const activeMode = MODES.find((m) => m.id === mode)!;
 
   const nearby = useQuery({
     queryKey: ["trend-nearby", city?.name, city?.lat, city?.lng],
@@ -176,27 +220,59 @@ function Trend() {
         photo: r.photo,
         latitude: r.latitude,
         longitude: r.longitude,
+        openNow: r.openNow,
         distance: origin
           ? +haversineKm(origin, { lat: r.latitude, lng: r.longitude }).toFixed(1)
           : 0,
       }));
 
+    // Thresholds relativos à cidade — evita hardcode global e adapta-se à densidade local.
+    const reviewsSorted = enriched.map((r) => r.reviews).sort((a, b) => a - b);
+    const percentile = (p: number) =>
+      reviewsSorted.length
+        ? reviewsSorted[Math.min(reviewsSorted.length - 1, Math.floor(p * reviewsSorted.length))]
+        : 0;
+    const p25 = percentile(0.25);
+    const p60 = percentile(0.6);
+    const p85 = percentile(0.85);
+
+    const now = new Date();
+    const hour = now.getHours();
+    const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+
     const score = (r: (typeof enriched)[number]) => {
       switch (mode) {
-        // 📈 Em Alta: volume × qualidade
-        case "trending":
-          return r.reviews * r.rating;
-        // 💎 Achadinhos: alta nota com pouca exposição
-        case "hidden":
-          return r.reviews >= 10 && r.reviews <= 400 && r.rating >= 4.3
-            ? r.rating / Math.log10(r.reviews + 10)
-            : -Infinity;
-        // 👑 Imperdíveis: consagrados (muitas reviews + nota bem acima de 4)
-        case "must":
-          return r.reviews * Math.max(r.rating - 4.0, 0);
-        // 📍 Mais Próximo: proximidade priorizada, ponderada por rating
-        case "closest":
-          return (r.rating || 3) / (r.distance + 0.3);
+        // 🔥 Em Alta — proxy de "spike": nota forte + volume em faixa de crescimento (sino em ~600 reviews).
+        case "trending": {
+          if (r.rating < 4.3) return -Infinity;
+          if (r.reviews < Math.max(80, p25)) return -Infinity;
+          if (r.reviews > Math.max(2500, p85 * 1.5)) return -Infinity;
+          const bell = Math.exp(-Math.pow(Math.log10(r.reviews) - Math.log10(600), 2) / 0.35);
+          return Math.pow(r.rating - 3.5, 2) * bell * 100;
+        }
+        // 💎 Achadinhos — nota altíssima com volume moderado-baixo relativo à cidade.
+        case "gems": {
+          const min = Math.max(15, Math.min(p25, 30));
+          const max = Math.max(350, p60);
+          if (r.rating < 4.4) return -Infinity;
+          if (r.reviews < min || r.reviews > max) return -Infinity;
+          return (r.rating - 3.5) * (1 / Math.log10(r.reviews + 20)) * 10;
+        }
+        // 🏆 Consagrados — clássicos de alto volume sustentado e nota alta consistente.
+        case "top": {
+          const heavy = Math.max(800, p85);
+          if (r.reviews < heavy) return -Infinity;
+          if (r.rating < 4.4) return -Infinity;
+          return Math.pow(r.rating - 3.8, 2) * Math.log10(r.reviews + 10);
+        }
+        // 📍 Próximos — distância + aberto agora + contexto de horário.
+        case "nearby": {
+          if (r.rating < 3.8) return -Infinity;
+          const distancePenalty = 1 / (r.distance + 0.4);
+          const openBoost = r.openNow === true ? 1.35 : r.openNow === false ? 0.6 : 1;
+          const ctx = contextualWeight(r.cuisine, hour, isWeekend);
+          return r.rating * distancePenalty * openBoost * ctx;
+        }
       }
     };
 
@@ -216,14 +292,19 @@ function Trend() {
             <MapPin className="h-3.5 w-3.5" />
             {city?.detected ? "Metrópole detectada" : "Metrópole"}
           </div>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">Best Trend em {city?.name ?? "sua região"}</h1>
-          <p className="mt-1 text-muted-foreground">
-            {loc && geoQuery.data?.city
-              ? `Ranking real do Google Maps em metrópoles próximas de ${geoQuery.data.city}${
-                  geoQuery.data.country ? `, ${geoQuery.data.country}` : ""
-                }.`
-              : "Ative a localização para ver o ranking real perto de você."}
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">
+            {activeMode.emoji} {activeMode.label} em {city?.name ?? "sua região"}
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground sm:text-base">
+            {modeDescription(mode, city?.name)}
           </p>
+          {mode === "nearby" && (
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              Contexto: {new Date().getHours()}h ·{" "}
+              {new Date().getDay() === 0 || new Date().getDay() === 6 ? "fim de semana" : "dia útil"}
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {cities.map((c) => (
