@@ -99,7 +99,7 @@ function Detail() {
     <article>
       <div className="relative">
         <div className="relative h-64 md:h-96 w-full overflow-hidden bg-muted">
-          <img src={heroPhoto} alt={r.name} className="h-full w-full object-cover" />
+          <img src={heroPhoto} alt={displayName} className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
           <Link to="/" className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full bg-background/90 px-3 py-1.5 text-sm backdrop-blur hover:bg-background">
             <ArrowLeft className="h-4 w-4" /> Voltar
