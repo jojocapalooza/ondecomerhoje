@@ -270,7 +270,7 @@ function Home() {
                     onFocus={() => setShowAuto(true)}
                     onBlur={() => setTimeout(() => setShowAuto(false), 150)}
                     onKeyDown={(e) => e.key === "Enter" && submitSearch()}
-                    placeholder="Buscar restaurante..."
+                    placeholder="Buscar por restaurante, prato ou categoria (ex.: sushi, feijoada, vegan)…"
                     className="h-11 flex-1 border-0 bg-transparent focus-visible:ring-0 shadow-none text-base"
                   />
                   <button
