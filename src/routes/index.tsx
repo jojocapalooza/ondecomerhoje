@@ -158,6 +158,17 @@ function Home() {
         )
           return false;
       }
+      // Rodízio é exclusivo para all-you-can-eat / buffet livre. O Google
+      // devolve churrascarias à la carte junto — filtramos por indícios no
+      // nome ou tipo do lugar.
+      if (specialSelected.includes("Rodízio")) {
+        const hay = `${r.name} ${r.cuisine}`.toLowerCase();
+        const isAyce =
+          /rod[íi]zio|all[-\s]?you[-\s]?can[-\s]?eat|buffet|à\s*vontade|a\s*vontade|livre/.test(
+            hay,
+          );
+        if (!isAyce) return false;
+      }
       // Categorias clássicas (Italiana, Japonesa, …) filtram por rótulo.
       // Categorias especiais (Vegan, Brunch, …) já entraram como palavra-chave
       // no textSearch — não filtramos localmente porque o Google raramente
@@ -194,7 +205,7 @@ function Home() {
         break;
     }
     return list;
-  }, [debounced, filters, classicSelected, sort, userLoc, usingRemote, remoteList]);
+  }, [debounced, filters, classicSelected, specialSelected, sort, userLoc, usingRemote, remoteList]);
 
   function startVoice() {
     const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
