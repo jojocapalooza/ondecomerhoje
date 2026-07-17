@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Filters, defaultFilters, type FilterState } from "@/components/Filters";
 import { RestaurantCard } from "@/components/RestaurantCard";
-import { restaurants } from "@/lib/restaurants";
+import { restaurants, SPECIAL_CATEGORIES, CATEGORY_QUERY_TERMS } from "@/lib/restaurants";
 import { getSearchHistory, pushSearch, clearSearchHistory, useUserLocation, haversineKm } from "@/lib/favorites";
 import {
   searchNearbyRestaurants,
@@ -48,6 +48,32 @@ function Home() {
   });
   const regionCode = geoQuery.data?.countryCode;
 
+  // Combina texto digitado (nome do restaurante OU nome de prato) +
+  // palavras-chave das categorias especiais selecionadas. É isso que
+  // é enviado ao Google Places para achar pratos como "feijoada",
+  // "sushi de salmão", ou filtrar por Vegan/Pet-friendly/Brunch etc.
+  const specialSelected = useMemo(
+    () =>
+      filters.cuisines.filter((c) =>
+        (SPECIAL_CATEGORIES as readonly string[]).includes(c),
+      ),
+    [filters.cuisines],
+  );
+  const classicSelected = useMemo(
+    () =>
+      filters.cuisines.filter(
+        (c) => !(SPECIAL_CATEGORIES as readonly string[]).includes(c),
+      ),
+    [filters.cuisines],
+  );
+  const effectiveQuery = useMemo(() => {
+    const parts = [
+      debounced,
+      ...specialSelected.map((s) => CATEGORY_QUERY_TERMS[s] ?? s),
+    ].filter(Boolean);
+    return parts.join(" ").trim();
+  }, [debounced, specialSelected]);
+
   // Lista de restaurantes: por texto (quando há busca) ou por proximidade
   const nearbyQuery = useQuery({
     queryKey: ["nearby", userLoc?.lat, userLoc?.lng, regionCode],
@@ -60,28 +86,28 @@ function Home() {
           regionCode,
         },
       }),
-    enabled: !!userLoc && !debounced,
+    enabled: !!userLoc && !effectiveQuery,
     staleTime: 5 * 60 * 1000,
   });
   const textQuery = useQuery({
-    queryKey: ["places-text", debounced, userLoc?.lat, userLoc?.lng, regionCode],
+    queryKey: ["places-text", effectiveQuery, userLoc?.lat, userLoc?.lng, regionCode],
     queryFn: () =>
       fetchText({
         data: {
-          query: debounced,
+          query: effectiveQuery,
           latitude: userLoc?.lat,
           longitude: userLoc?.lng,
           regionCode,
         },
       }),
-    enabled: !!debounced,
+    enabled: !!effectiveQuery,
     staleTime: 5 * 60 * 1000,
   });
 
-  const remoteList: NearbyRestaurant[] | undefined = debounced
+  const remoteList: NearbyRestaurant[] | undefined = effectiveQuery
     ? textQuery.data
     : nearbyQuery.data;
-  const loadingRemote = debounced ? textQuery.isLoading : nearbyQuery.isLoading;
+  const loadingRemote = effectiveQuery ? textQuery.isLoading : nearbyQuery.isLoading;
   const usingRemote = !!userLoc && !!remoteList;
 
   useEffect(() => {
@@ -122,8 +148,21 @@ function Home() {
         : (r as { distance?: number }).distance ?? 0,
     }));
     let list = withDist.filter((r) => {
-      if (debounced && !r.name.toLowerCase().includes(debounced.toLowerCase()) && !r.cuisine.toLowerCase().includes(debounced.toLowerCase())) return false;
-      if (filters.cuisines.length && !filters.cuisines.includes(r.cuisine)) return false;
+      // Quando usamos dados do Google, ele já casou por texto (nome, prato,
+      // categoria). Só aplicamos o filtro local de texto no fallback mock.
+      if (!usingRemote && debounced) {
+        const q = debounced.toLowerCase();
+        if (
+          !r.name.toLowerCase().includes(q) &&
+          !r.cuisine.toLowerCase().includes(q)
+        )
+          return false;
+      }
+      // Categorias clássicas (Italiana, Japonesa, …) filtram por rótulo.
+      // Categorias especiais (Vegan, Brunch, …) já entraram como palavra-chave
+      // no textSearch — não filtramos localmente porque o Google raramente
+      // devolve esse rótulo em `cuisine`.
+      if (classicSelected.length && !classicSelected.includes(r.cuisine)) return false;
       if (r.distance > filters.maxDistance) return false;
       if (r.rating < filters.minRating) return false;
       if (filters.priceLevels.length && !filters.priceLevels.includes(r.priceLevel)) return false;
@@ -155,7 +194,7 @@ function Home() {
         break;
     }
     return list;
-  }, [debounced, filters, sort, userLoc, usingRemote, remoteList]);
+  }, [debounced, filters, classicSelected, sort, userLoc, usingRemote, remoteList]);
 
   function startVoice() {
     const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -231,7 +270,7 @@ function Home() {
                     onFocus={() => setShowAuto(true)}
                     onBlur={() => setTimeout(() => setShowAuto(false), 150)}
                     onKeyDown={(e) => e.key === "Enter" && submitSearch()}
-                    placeholder="Buscar restaurante..."
+                    placeholder="Buscar por restaurante, prato ou categoria (ex.: sushi, feijoada, vegan)…"
                     className="h-11 flex-1 border-0 bg-transparent focus-visible:ring-0 shadow-none text-base"
                   />
                   <button

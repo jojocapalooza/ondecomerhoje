@@ -47,7 +47,31 @@ export const cuisines = [
   "Vegetariana",
   "Hambúrguer",
   "Pizzaria",
+  "Vegan",
+  "Pet-friendly",
+  "Biológico",
+  "Brunch",
+  "Rodízio",
 ];
+
+// Categorias que não são culinárias tradicionais e sim características/estilo.
+// Ao selecionar (ou digitar) uma delas, o buscador envia palavras-chave
+// adicionais para o Google Places para achar lugares compatíveis.
+export const SPECIAL_CATEGORIES = [
+  "Vegan",
+  "Pet-friendly",
+  "Biológico",
+  "Brunch",
+  "Rodízio",
+] as const;
+
+export const CATEGORY_QUERY_TERMS: Record<string, string> = {
+  Vegan: "restaurante vegano",
+  "Pet-friendly": "restaurante pet friendly",
+  "Biológico": "restaurante orgânico biológico",
+  Brunch: "brunch café da manhã",
+  "Rodízio": "rodízio",
+};
 
 const names = [
   "La Trattoria",
