@@ -153,8 +153,15 @@ const LIST_FIELD_MASK = [
   "places.photos",
 ].join(",");
 
-function toNearby(p: SearchPlace): NearbyRestaurant {
+async function toNearby(p: SearchPlace): Promise<NearbyRestaurant> {
   const cuisine = mapCuisine(p.primaryType, p.primaryTypeDisplayName?.text);
+  // Primeira foto do Google Maps do restaurante (fachada/interior).
+  // Fallback para imagem genérica por culinária apenas se o place não tiver fotos.
+  const firstPhotoName = p.photos?.[0]?.name;
+  let photo: string | null = null;
+  if (firstPhotoName) {
+    photo = await resolvePhotoUri(firstPhotoName, 800);
+  }
   return {
     id: p.id,
     name: p.displayName?.text ?? "Restaurante",
@@ -165,7 +172,7 @@ function toNearby(p: SearchPlace): NearbyRestaurant {
     address: p.formattedAddress ?? "",
     latitude: p.location?.latitude ?? 0,
     longitude: p.location?.longitude ?? 0,
-    photo: cuisinePhoto(cuisine),
+    photo: photo ?? cuisinePhoto(cuisine),
     openNow: p.currentOpeningHours?.openNow,
   };
 }
@@ -205,7 +212,7 @@ export const searchNearbyRestaurants = createServerFn({ method: "POST" })
       return [];
     }
     const json = (await res.json()) as { places?: SearchPlace[] };
-    return (json.places ?? []).map(toNearby);
+    return Promise.all((json.places ?? []).map(toNearby));
   });
 
 // Busca por texto (nome/culinária) próximo à localização
@@ -246,7 +253,7 @@ export const searchRestaurantsByText = createServerFn({ method: "POST" })
       return [];
     }
     const json = (await res.json()) as { places?: SearchPlace[] };
-    return (json.places ?? []).map(toNearby);
+    return Promise.all((json.places ?? []).map(toNearby));
   });
 
 // Reverse geocode → cidade/estado/país do usuário
