@@ -282,6 +282,19 @@ async function fetchFixedPriceAllYouCanEatEvidence(placeId: string, regionCode?:
   return hasFixedPriceAllYouCanEatEvidence(evidence);
 }
 
+function hasSearchPlaceAllYouCanEatEvidence(place: SearchPlace) {
+  return hasFixedPriceAllYouCanEatEvidence(
+    [
+      place.displayName?.text,
+      place.primaryType,
+      place.primaryTypeDisplayName?.text,
+      ...(place.types ?? []),
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+}
+
 // Busca restaurantes próximos à localização do usuário
 export const searchNearbyRestaurants = createServerFn({ method: "POST" })
   .inputValidator(
@@ -370,18 +383,29 @@ export const searchRestaurantsByText = createServerFn({ method: "POST" })
       if (!placesById.has(place.id)) placesById.set(place.id, place);
     }
 
-    const mapped = await Promise.all(Array.from(placesById.values()).map(toNearby));
-    if (!isAyceSearch) return mapped;
+    const places = Array.from(placesById.values());
+    if (!isAyceSearch) return Promise.all(places.map(toNearby));
 
-    const enriched = await Promise.all(
-      mapped.map(async (restaurant) => ({
-        ...restaurant,
-        allYouCanEat:
-          restaurant.allYouCanEat ||
-          (await fetchFixedPriceAllYouCanEatEvidence(restaurant.id, data.regionCode)),
+    const confirmedPlaces = (
+      await Promise.all(
+        places.map(async (place) => ({
+          place,
+          confirmed:
+            hasSearchPlaceAllYouCanEatEvidence(place) ||
+            (await fetchFixedPriceAllYouCanEatEvidence(place.id, data.regionCode)),
+        })),
+      )
+    )
+      .filter((item) => item.confirmed)
+      .map((item) => item.place);
+
+    const mapped = await Promise.all(
+      confirmedPlaces.slice(0, 20).map(async (place) => ({
+        ...(await toNearby(place)),
+        allYouCanEat: true,
       })),
     );
-    return enriched.filter((restaurant) => restaurant.allYouCanEat);
+    return mapped;
   });
 
 // Reverse geocode → cidade/estado/país do usuário
