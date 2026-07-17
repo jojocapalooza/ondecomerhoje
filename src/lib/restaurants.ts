@@ -70,7 +70,7 @@ export const CATEGORY_QUERY_TERMS: Record<string, string> = {
   "Pet-friendly": "restaurante pet friendly",
   "Biológico": "restaurante orgânico biológico",
   Brunch: "brunch café da manhã",
-  "Rodízio": "rodízio all you can eat buffet livre à vontade",
+  "Rodízio": "rodízio preço fixo comer à vontade buffet livre all you can eat coma à vontade",
 };
 
 const names = [

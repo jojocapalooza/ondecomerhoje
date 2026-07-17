@@ -137,6 +137,7 @@ function Home() {
           photo: r.photo,
           latitude: r.latitude,
           longitude: r.longitude,
+            allYouCanEat: r.allYouCanEat,
           isNew: false,
           promo: false,
         }))
@@ -164,7 +165,8 @@ function Home() {
       if (specialSelected.includes("Rodízio")) {
         const hay = `${r.name} ${r.cuisine}`.toLowerCase();
         const isAyce =
-          /rod[íi]zio|all[-\s]?you[-\s]?can[-\s]?eat|buffet|à\s*vontade|a\s*vontade|livre/.test(
+          (r as { allYouCanEat?: boolean }).allYouCanEat ||
+          /\b(rod[íi]zios?|all[-\s]?you[-\s]?can[-\s]?eat|coma(?:r)?\s+(?:à|a)\s+vontade|(?:a|à)\s+vontade|buffet\s+(?:livre|(?:à|a)\s+vontade)|espeto\s+corrido|sequ[êe]ncia\s+(?:livre|(?:à|a)\s+vontade))\b/.test(
             hay,
           );
         if (!isAyce) return false;
