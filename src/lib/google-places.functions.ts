@@ -59,7 +59,45 @@ const CUISINE_MAP: Record<string, string> = {
   bakery: "Padaria",
   bar: "Bar",
   meal_takeaway: "Delivery",
+  buffet_restaurant: "Buffet",
 };
+
+const FIXED_PRICE_AYCE_POSITIVE =
+  /\b(rod[íi]zios?|all[-\s]?you[-\s]?can[-\s]?eat|coma(?:r)?\s+(?:à|a)\s+vontade|(?:à|a)\s+vontade|buffet\s+(?:livre|libre|(?:à|a)\s+vontade|pre[çc]o\s+fixo)|pre[çc]o\s+fixo|valor\s+fixo|fixed\s+price|tenedor\s+libre|espeto\s+corrido|sequ[êe]ncia\s+(?:livre|(?:à|a)\s+vontade))\b/i;
+
+const FIXED_PRICE_AYCE_NEGATIVE =
+  /\b(n[aã]o\s+(?:tem|serve|faz|[ée])\s+rod[íi]zio|sem\s+rod[íi]zio|not\s+all[-\s]?you[-\s]?can[-\s]?eat|a\s+la\s+carte|[àa]\s+la\s+carte|por\s+quilo|por\s+kg|buffet\s+por\s+quilo|self[-\s]?service\s+por\s+quilo)\b/i;
+
+function hasFixedPriceAllYouCanEatEvidence(text: string) {
+  return FIXED_PRICE_AYCE_POSITIVE.test(text) && !FIXED_PRICE_AYCE_NEGATIVE.test(text);
+}
+
+function isFixedPriceAllYouCanEatQuery(query: string) {
+  return hasFixedPriceAllYouCanEatEvidence(query) || /\brod[íi]zio\b/i.test(query);
+}
+
+function stripAllYouCanEatIntent(query: string) {
+  return query
+    .replace(FIXED_PRICE_AYCE_POSITIVE, " ")
+    .replace(/\b(restaurantes?|comida|perto\s+de\s+mim|buffet|livre|coma|comer|vontade|pre[çc]o|fixo|fixed|price)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildFixedPriceAllYouCanEatQueries(query: string) {
+  const subject = stripAllYouCanEatIntent(query);
+  const prefix = subject ? `${subject} ` : "";
+  return [
+    `${prefix}rodízio preço fixo`,
+    `${prefix}rodizio preço fixo`,
+    `${prefix}rodízio à vontade`,
+    `${prefix}coma à vontade preço fixo`,
+    `${prefix}buffet livre preço fixo`,
+    `${prefix}all you can eat fixed price`,
+    `${prefix}sequência à vontade preço fixo`,
+    `${prefix}espeto corrido preço fixo`,
+  ];
+}
 
 function mapCuisine(primaryType?: string, displayName?: string) {
   if (primaryType && CUISINE_MAP[primaryType]) return CUISINE_MAP[primaryType];
@@ -123,6 +161,7 @@ export type NearbyRestaurant = {
   longitude: number;
   photo: string;
   openNow?: boolean;
+  allYouCanEat?: boolean;
 };
 
 type SearchPlace = {
@@ -137,6 +176,7 @@ type SearchPlace = {
   primaryTypeDisplayName?: { text?: string };
   currentOpeningHours?: { openNow?: boolean };
   photos?: Array<{ name: string }>;
+  types?: string[];
 };
 
 const LIST_FIELD_MASK = [
@@ -149,6 +189,7 @@ const LIST_FIELD_MASK = [
   "places.location",
   "places.primaryType",
   "places.primaryTypeDisplayName",
+  "places.types",
   "places.currentOpeningHours",
   "places.photos",
 ].join(",");
@@ -174,7 +215,54 @@ async function toNearby(p: SearchPlace): Promise<NearbyRestaurant> {
     longitude: p.location?.longitude ?? 0,
     photo: photo ?? cuisinePhoto(cuisine),
     openNow: p.currentOpeningHours?.openNow,
+    allYouCanEat: hasFixedPriceAllYouCanEatEvidence(
+      [
+        p.displayName?.text,
+        cuisine,
+        p.primaryType,
+        p.primaryTypeDisplayName?.text,
+        ...(p.types ?? []),
+      ]
+        .filter(Boolean)
+        .join(" "),
+    ),
   };
+}
+
+async function fetchFixedPriceAllYouCanEatEvidence(placeId: string, regionCode?: string) {
+  const fieldMask = [
+    "id",
+    "displayName",
+    "primaryType",
+    "primaryTypeDisplayName",
+    "types",
+    "editorialSummary",
+    "reviews",
+  ].join(",");
+  const res = await gatewayFetch(
+    `/places/v1/places/${placeId}?languageCode=pt-BR&regionCode=${regionCode ?? "BR"}`,
+    { method: "GET", headers: { "X-Goog-FieldMask": fieldMask } },
+  );
+  if (!res.ok) return false;
+  const place = (await res.json()) as {
+    displayName?: { text?: string };
+    primaryType?: string;
+    primaryTypeDisplayName?: { text?: string };
+    types?: string[];
+    editorialSummary?: { text?: string };
+    reviews?: Array<{ text?: { text?: string }; originalText?: { text?: string } }>;
+  };
+  const evidence = [
+    place.displayName?.text,
+    place.primaryType,
+    place.primaryTypeDisplayName?.text,
+    ...(place.types ?? []),
+    place.editorialSummary?.text,
+    ...(place.reviews ?? []).flatMap((review) => [review.text?.text, review.originalText?.text]),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return hasFixedPriceAllYouCanEatEvidence(evidence);
 }
 
 // Busca restaurantes próximos à localização do usuário
@@ -228,32 +316,55 @@ export const searchRestaurantsByText = createServerFn({ method: "POST" })
     }) => input,
   )
   .handler(async ({ data }): Promise<NearbyRestaurant[]> => {
-    const body: Record<string, unknown> = {
-      textQuery: data.query,
-      maxResultCount: 20,
-      includedType: "restaurant",
-      languageCode: data.languageCode ?? "pt-BR",
-      regionCode: data.regionCode ?? "BR",
-    };
-    if (typeof data.latitude === "number" && typeof data.longitude === "number") {
-      body.locationBias = {
-        circle: {
-          center: { latitude: data.latitude, longitude: data.longitude },
-          radius: Math.min(data.radius ?? 10000, 50000),
-        },
+    const isAyceSearch = isFixedPriceAllYouCanEatQuery(data.query);
+    const queries = isAyceSearch ? buildFixedPriceAllYouCanEatQueries(data.query) : [data.query];
+    const search = async (textQuery: string, maxResultCount = 20) => {
+      const body: Record<string, unknown> = {
+        textQuery,
+        maxResultCount,
+        includedType: "restaurant",
+        languageCode: data.languageCode ?? "pt-BR",
+        regionCode: data.regionCode ?? "BR",
       };
+      if (typeof data.latitude === "number" && typeof data.longitude === "number") {
+        body.locationBias = {
+          circle: {
+            center: { latitude: data.latitude, longitude: data.longitude },
+            radius: Math.min(data.radius ?? (isAyceSearch ? 25000 : 10000), 50000),
+          },
+        };
+      }
+      const res = await gatewayFetch(`/places/v1/places:searchText`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Goog-FieldMask": LIST_FIELD_MASK },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        console.error(`[places] searchText list failed [${res.status}]: ${await res.text()}`);
+        return [] as SearchPlace[];
+      }
+      const json = (await res.json()) as { places?: SearchPlace[] };
+      return json.places ?? [];
+    };
+
+    const placesById = new Map<string, SearchPlace>();
+    const batches = await Promise.all(queries.map((q) => search(q, isAyceSearch ? 8 : 20)));
+    for (const place of batches.flat()) {
+      if (!placesById.has(place.id)) placesById.set(place.id, place);
     }
-    const res = await gatewayFetch(`/places/v1/places:searchText`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Goog-FieldMask": LIST_FIELD_MASK },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      console.error(`[places] searchText list failed [${res.status}]: ${await res.text()}`);
-      return [];
-    }
-    const json = (await res.json()) as { places?: SearchPlace[] };
-    return Promise.all((json.places ?? []).map(toNearby));
+
+    const mapped = await Promise.all(Array.from(placesById.values()).map(toNearby));
+    if (!isAyceSearch) return mapped;
+
+    const enriched = await Promise.all(
+      mapped.map(async (restaurant) => ({
+        ...restaurant,
+        allYouCanEat:
+          restaurant.allYouCanEat ||
+          (await fetchFixedPriceAllYouCanEatEvidence(restaurant.id, data.regionCode)),
+      })),
+    );
+    return enriched.filter((restaurant) => restaurant.allYouCanEat);
   });
 
 // Reverse geocode → cidade/estado/país do usuário
