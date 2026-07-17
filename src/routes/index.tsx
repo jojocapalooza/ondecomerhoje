@@ -166,7 +166,7 @@ function Home() {
         const hay = `${r.name} ${r.cuisine}`.toLowerCase();
         const isAyce =
           (r as { allYouCanEat?: boolean }).allYouCanEat ||
-          /\b(rod[íi]zios?|all[-\s]?you[-\s]?can[-\s]?eat|coma(?:r)?\s+(?:à|a)\s+vontade|(?:à|a)\s+vontade|buffet\s+(?:livre|(?:à|a)\s+vontade|pre[çc]o\s+fixo)|pre[çc]o\s+fixo|valor\s+fixo|fixed\s+price|espeto\s+corrido|sequ[êe]ncia\s+(?:livre|(?:à|a)\s+vontade))\b/.test(
+          /\b(rod[íi]zios?|all[-\s]?you[-\s]?can[-\s]?eat|coma(?:r)?\s+(?:à|a)\s+vontade|(?:a|à)\s+vontade|buffet\s+(?:livre|(?:à|a)\s+vontade)|espeto\s+corrido|sequ[êe]ncia\s+(?:livre|(?:à|a)\s+vontade))\b/.test(
             hay,
           );
         if (!isAyce) return false;

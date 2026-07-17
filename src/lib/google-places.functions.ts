@@ -62,23 +62,40 @@ const CUISINE_MAP: Record<string, string> = {
   buffet_restaurant: "Buffet",
 };
 
-const FIXED_PRICE_AYCE_POSITIVE =
-  /\b(rod[íi]zios?|all[-\s]?you[-\s]?can[-\s]?eat|coma(?:r)?\s+(?:à|a)\s+vontade|(?:à|a)\s+vontade|buffet\s+(?:livre|libre|(?:à|a)\s+vontade|pre[çc]o\s+fixo)|pre[çc]o\s+fixo|valor\s+fixo|fixed\s+price|tenedor\s+libre|espeto\s+corrido|sequ[êe]ncia\s+(?:livre|(?:à|a)\s+vontade))\b/i;
+const FIXED_PRICE_AYCE_DIRECT =
+  /\b(rodizios?|all[-\s]?you[-\s]?can[-\s]?eat|coma(?:r)?\s+a\s+vontade|a\s+vontade|buffet\s+(?:livre|libre|a\s+vontade)|tenedor\s+libre|espeto\s+corrido|sequencia\s+(?:livre|a\s+vontade))\b/i;
+
+const FIXED_PRICE_CUE = /\b(preco\s+fixo|valor\s+fixo|preco\s+unico|valor\s+unico|fixed\s+price|flat\s+fee)\b/i;
+
+const UNLIMITED_CUE = /\b(coma(?:r)?\s+a\s+vontade|a\s+vontade|buffet\s+livre|livre|rodizios?|all[-\s]?you[-\s]?can[-\s]?eat|espeto\s+corrido|sequencia)\b/i;
 
 const FIXED_PRICE_AYCE_NEGATIVE =
-  /\b(n[aã]o\s+(?:tem|serve|faz|[ée])\s+rod[íi]zio|sem\s+rod[íi]zio|not\s+all[-\s]?you[-\s]?can[-\s]?eat|a\s+la\s+carte|[àa]\s+la\s+carte|por\s+quilo|por\s+kg|buffet\s+por\s+quilo|self[-\s]?service\s+por\s+quilo)\b/i;
+  /\b(nao\s+(?:tem|serve|faz|e)\s+rodizio|sem\s+rodizio|not\s+all[-\s]?you[-\s]?can[-\s]?eat|a\s+la\s+carte|por\s+quilo|por\s+kg|buffet\s+por\s+quilo|self[-\s]?service\s+por\s+quilo)\b/i;
+
+function normalizeAyceText(text: string) {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
 
 function hasFixedPriceAllYouCanEatEvidence(text: string) {
-  return FIXED_PRICE_AYCE_POSITIVE.test(text) && !FIXED_PRICE_AYCE_NEGATIVE.test(text);
+  const normalized = normalizeAyceText(text);
+  if (FIXED_PRICE_AYCE_NEGATIVE.test(normalized)) return false;
+  return (
+    FIXED_PRICE_AYCE_DIRECT.test(normalized) ||
+    (FIXED_PRICE_CUE.test(normalized) && UNLIMITED_CUE.test(normalized))
+  );
 }
 
 function isFixedPriceAllYouCanEatQuery(query: string) {
-  return hasFixedPriceAllYouCanEatEvidence(query) || /\brod[íi]zio\b/i.test(query);
+  const normalized = normalizeAyceText(query);
+  return hasFixedPriceAllYouCanEatEvidence(query) || /\brodizio\b/i.test(normalized);
 }
 
 function stripAllYouCanEatIntent(query: string) {
   return query
-    .replace(FIXED_PRICE_AYCE_POSITIVE, " ")
+    .replace(/rod[íi]zios?|all[-\s]?you[-\s]?can[-\s]?eat|coma(?:r)?\s+(?:à|a)\s+vontade|(?:à|a)\s+vontade|buffet\s+(?:livre|libre|(?:à|a)\s+vontade|pre[çc]o\s+fixo)|pre[çc]o\s+fixo|valor\s+fixo|fixed\s+price|tenedor\s+libre|espeto\s+corrido|sequ[êe]ncia\s+(?:livre|(?:à|a)\s+vontade)/gi, " ")
     .replace(/\b(restaurantes?|comida|perto\s+de\s+mim|buffet|livre|coma|comer|vontade|pre[çc]o|fixo|fixed|price)\b/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
