@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { isNativeApp } from "./mobile-bridge";
 
 const KEY = "och_favorites";
