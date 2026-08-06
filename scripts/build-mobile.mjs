@@ -8,7 +8,8 @@
 // aparelho; só as consultas de dados vão para a API publicada.
 import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { mkdir, writeFile, rm, readdir, stat } from "node:fs/promises";
+import { mkdir, writeFile, rm, readdir, stat, readFile, cp } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 // Só a raiz é pré-renderizada: dentro do APK o WebView sempre abre index.html
@@ -18,6 +19,27 @@ const ROUTES = ["/"];
 // Arquivos que não servem para nada dentro do APK.
 const DROP = ["_headers", "robots.txt", "sitemap.xml", "favoritos", "trend", "perfil"];
 const OUT = "dist/client";
+
+// O nitro pode gerar em `dist/` ou em `.output/` dependendo da versão/preset.
+// Lemos o manifesto para descobrir onde estão o handler e os arquivos públicos.
+async function resolveBuildOutput() {
+  for (const base of ["dist", ".output"]) {
+    const manifest = join(base, "nitro.json");
+    if (!existsSync(manifest)) continue;
+    const json = JSON.parse(await readFile(manifest, "utf8"));
+    const serverEntry = join(base, json.serverEntry ?? "server/index.mjs");
+    const publicDir = join(base, json.publicDir ?? "client");
+    if (existsSync(serverEntry)) return { base, serverEntry, publicDir };
+  }
+  // fallback: caminhos conhecidos
+  for (const [serverEntry, publicDir] of [
+    ["dist/server/index.mjs", "dist/client"],
+    [".output/server/index.mjs", ".output/public"],
+  ]) {
+    if (existsSync(serverEntry)) return { base: dirname(dirname(serverEntry)), serverEntry, publicDir };
+  }
+  throw new Error("não encontrei o build do servidor (dist/ ou .output/). Rode o build antes.");
+}
 
 async function dirSize(dir) {
   let total = 0;
@@ -57,7 +79,17 @@ async function main() {
     await run("npx", ["vite", "build"]);
   }
 
-  const mod = await import(pathToFileURL(join(process.cwd(), "dist/server/index.mjs")).href);
+  const { serverEntry, publicDir } = await resolveBuildOutput();
+  console.log(`build encontrado: ${serverEntry} (público: ${publicDir})`);
+
+  // O Capacitor lê sempre de dist/client; se o nitro gerou em outro lugar, copiamos.
+  if (publicDir !== OUT) {
+    await rm(OUT, { recursive: true, force: true });
+    await mkdir(dirname(OUT), { recursive: true });
+    await cp(publicDir, OUT, { recursive: true });
+  }
+
+  const mod = await import(pathToFileURL(join(process.cwd(), serverEntry)).href);
   const handler = mod.default ?? mod;
 
   for (const route of ROUTES) {
