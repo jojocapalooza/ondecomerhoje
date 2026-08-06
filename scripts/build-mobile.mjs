@@ -7,10 +7,10 @@
 // Assim o APK abre instantaneamente com a interface vinda de dentro do
 // aparelho; só as consultas de dados vão para a API publicada.
 import { spawn } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-const PORT = Number(process.env["MOBILE_PREVIEW_PORT"] ?? 4183);
 const ROUTES = ["/", "/favoritos", "/trend", "/perfil"];
 const OUT = "dist/client";
 
@@ -22,17 +22,20 @@ function run(cmd, args, opts = {}) {
   });
 }
 
-async function waitFor(url, tries = 90) {
-  for (let i = 0; i < tries; i += 1) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) return;
-    } catch {
-      /* ainda subindo */
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  throw new Error(`servidor de preview não respondeu em ${url}`);
+// Renderiza uma rota chamando o handler do build direto em memória — não
+// precisamos subir servidor nem ter runtime de edge instalado.
+async function render(handler, route) {
+  const request = new Request(`https://ondecomerhoje.lovable.app${route}`, {
+    headers: { accept: "text/html", "user-agent": "onde-comer-hoje-mobile-build" },
+  });
+  // o runtime mutila `request.ip`; deixamos a propriedade gravável antes.
+  Object.defineProperty(request, "ip", { value: "127.0.0.1", writable: true, configurable: true });
+  const response = await handler.fetch(request, process.env, {
+    waitUntil: () => {},
+    passThroughOnException: () => {},
+  });
+  if (!response.ok) throw new Error(`falha ao renderizar ${route}: ${response.status}`);
+  return response.text();
 }
 
 async function main() {
@@ -40,30 +43,15 @@ async function main() {
     await run("npx", ["vite", "build"]);
   }
 
-  // O servidor de preview procura dist/server/server.js; o build gera index.mjs.
-  await writeFile(
-    "dist/server/server.js",
-    'export * from "./index.mjs";\nexport { default } from "./index.mjs";\n',
-    "utf8",
-  );
+  const mod = await import(pathToFileURL(join(process.cwd(), "dist/server/index.mjs")).href);
+  const handler = mod.default ?? mod;
 
-  const server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--host", "127.0.0.1"], {
-    stdio: "inherit",
-  });
-
-  try {
-    await waitFor(`http://127.0.0.1:${PORT}/`);
-    for (const route of ROUTES) {
-      const res = await fetch(`http://127.0.0.1:${PORT}${route}`);
-      if (!res.ok) throw new Error(`falha ao capturar ${route}: ${res.status}`);
-      const html = await res.text();
-      const file = route === "/" ? join(OUT, "index.html") : join(OUT, route.slice(1), "index.html");
-      await mkdir(dirname(file), { recursive: true });
-      await writeFile(file, html, "utf8");
-      console.log(`capturado ${route} -> ${file}`);
-    }
-  } finally {
-    server.kill("SIGTERM");
+  for (const route of ROUTES) {
+    const html = await render(handler, route);
+    const file = route === "/" ? join(OUT, "index.html") : join(OUT, route.slice(1), "index.html");
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, html, "utf8");
+    console.log(`capturado ${route} -> ${file}`);
   }
 
   console.log("\nPacote web pronto em dist/client. Agora: bun run android:sync");
