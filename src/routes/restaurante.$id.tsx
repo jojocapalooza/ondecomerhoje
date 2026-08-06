@@ -1,6 +1,6 @@
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
+import { useGetRestaurantPlace, useGetPlaceDetailsById } from "@/lib/data-rpc";
 import { ArrowLeft, CheckCircle2, Clock, Globe, Heart, MapPin, Phone, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,8 +68,8 @@ function Detail() {
   const { has, toggle } = useFavorites();
   const favId = r?.id ?? id;
   const fav = has(favId);
-  const fetchPlace = useServerFn(getRestaurantPlace);
-  const fetchDetails = useServerFn(getPlaceDetailsById);
+  const fetchPlace = useGetRestaurantPlace();
+  const fetchDetails = useGetPlaceDetailsById();
   const { data: place } = useSuspenseQuery({
     ...placeQueryOptions(id, r ?? undefined),
     queryFn: () =>

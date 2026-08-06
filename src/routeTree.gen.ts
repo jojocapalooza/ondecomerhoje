@@ -15,6 +15,7 @@ import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as FavoritosRouteImport } from './routes/favoritos'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RestauranteIdRouteImport } from './routes/restaurante.$id'
+import { Route as ApiPublicRpcRouteImport } from './routes/api/public/rpc'
 
 const TrendRoute = TrendRouteImport.update({
   id: '/trend',
@@ -46,6 +47,11 @@ const RestauranteIdRoute = RestauranteIdRouteImport.update({
   path: '/restaurante/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRpcRoute = ApiPublicRpcRouteImport.update({
+  id: '/api/public/rpc',
+  path: '/api/public/rpc',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/trend': typeof TrendRoute
   '/restaurante/$id': typeof RestauranteIdRoute
+  '/api/public/rpc': typeof ApiPublicRpcRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/trend': typeof TrendRoute
   '/restaurante/$id': typeof RestauranteIdRoute
+  '/api/public/rpc': typeof ApiPublicRpcRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/trend': typeof TrendRoute
   '/restaurante/$id': typeof RestauranteIdRoute
+  '/api/public/rpc': typeof ApiPublicRpcRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +90,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/trend'
     | '/restaurante/$id'
+    | '/api/public/rpc'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +99,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/trend'
     | '/restaurante/$id'
+    | '/api/public/rpc'
   id:
     | '__root__'
     | '/'
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/trend'
     | '/restaurante/$id'
+    | '/api/public/rpc'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +118,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TrendRoute: typeof TrendRoute
   RestauranteIdRoute: typeof RestauranteIdRoute
+  ApiPublicRpcRoute: typeof ApiPublicRpcRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RestauranteIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/rpc': {
+      id: '/api/public/rpc'
+      path: '/api/public/rpc'
+      fullPath: '/api/public/rpc'
+      preLoaderRoute: typeof ApiPublicRpcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TrendRoute: TrendRoute,
   RestauranteIdRoute: RestauranteIdRoute,
+  ApiPublicRpcRoute: ApiPublicRpcRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -3,7 +3,7 @@
 // não é suportado ou falha. Sem isso o app fica inutilizável no desktop.
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useGeocodeAddress } from "@/lib/data-rpc";
 import { MapPin, LocateFixed, Loader2, AlertTriangle } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ export function LocationBar({
 }) {
   const [open, setOpen] = useState(false);
   const [address, setAddress] = useState("");
-  const runGeocode = useServerFn(geocodeAddress);
+  const runGeocode = useGeocodeAddress();
 
   const search = useMutation({
     mutationFn: (value: string) => runGeocode({ data: { address: value } }),

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useReverseGeocode, useSearchNearbyRestaurants } from "@/lib/data-rpc";
 import { MapPin, Flame, Gem, Trophy, Navigation, Clock } from "lucide-react";
 import { RestaurantCard } from "@/components/RestaurantCard";
 import { useUserLocation, haversineKm } from "@/lib/favorites";
@@ -127,8 +127,8 @@ export const Route = createFileRoute("/trend")({
 
 function Trend() {
   const loc = useUserLocation().location;
-  const fetchGeo = useServerFn(reverseGeocode);
-  const fetchNearby = useServerFn(searchNearbyRestaurants);
+  const fetchGeo = useReverseGeocode();
+  const fetchNearby = useSearchNearbyRestaurants();
 
   const geoQuery = useQuery({
     queryKey: ["geo", loc?.lat, loc?.lng],
