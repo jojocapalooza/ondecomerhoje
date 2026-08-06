@@ -15,7 +15,9 @@ export function isNativeApp(): boolean {
   return !!cap && (cap.isNativePlatform?.() ?? true);
 }
 
-const REMOTE_PATHS = ["/_serverFn/", "/api/"];
+// As consultas de dados no APK passam por /api/public/rpc (com CORS liberado).
+// /_serverFn não funciona de origem cruzada, por isso não é reescrito aqui.
+const REMOTE_PATHS = ["/api/"];
 
 function needsRemote(path: string) {
   return REMOTE_PATHS.some((p) => path.startsWith(p));

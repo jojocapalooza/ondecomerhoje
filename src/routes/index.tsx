@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import {
+  useSearchNearbyRestaurants,
+  useSearchRestaurantsByText,
+  useReverseGeocode,
+} from "@/lib/data-rpc";
 import { Mic, Search, MapPin, Star, TrendingUp, Clock, Utensils } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -38,9 +42,9 @@ function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const geo = useUserLocation();
   const userLoc = geo.location;
-  const fetchNearby = useServerFn(searchNearbyRestaurants);
-  const fetchText = useServerFn(searchRestaurantsByText);
-  const fetchGeo = useServerFn(reverseGeocode);
+  const fetchNearby = useSearchNearbyRestaurants();
+  const fetchText = useSearchRestaurantsByText();
+  const fetchGeo = useReverseGeocode();
 
   // Reverse geocode: descobre país/cidade para adaptar região
   const geoQuery = useQuery({
