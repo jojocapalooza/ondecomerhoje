@@ -40,6 +40,13 @@ async function main() {
     await run("npx", ["vite", "build"]);
   }
 
+  // O servidor de preview procura dist/server/server.js; o build gera index.mjs.
+  await writeFile(
+    "dist/server/server.js",
+    'export * from "./index.mjs";\nexport { default } from "./index.mjs";\n',
+    "utf8",
+  );
+
   const server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--host", "127.0.0.1"], {
     stdio: "inherit",
   });
