@@ -362,9 +362,9 @@ function Home() {
 
       {/* Body */}
       <section className="mx-auto max-w-7xl px-4 py-8">
-        <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+        <LocationBar geo={geo} cityFromGps={geoQuery.data?.city} />
+        <div className="mt-6 grid gap-6 lg:grid-cols-[300px_1fr]">
           <aside className="space-y-4">
-            <LocationBar geo={geo} cityFromGps={geoQuery.data?.city} />
             <Filters value={filters} onChange={setFilters} />
           </aside>
           <div>
