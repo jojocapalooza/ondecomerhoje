@@ -13,6 +13,7 @@ import {
   searchNearbyRestaurants,
   searchRestaurantsByText,
   reverseGeocode,
+  geocodeAddress,
   type NearbyRestaurant,
 } from "@/lib/google-places.functions";
 
@@ -34,7 +35,8 @@ function Home() {
   const [visible, setVisible] = useState(9);
   const [showAuto, setShowAuto] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const userLoc = useUserLocation();
+  const geo = useUserLocation();
+  const userLoc = geo.location;
   const fetchNearby = useServerFn(searchNearbyRestaurants);
   const fetchText = useServerFn(searchRestaurantsByText);
   const fetchGeo = useServerFn(reverseGeocode);
@@ -88,6 +90,8 @@ function Home() {
       }),
     enabled: !!userLoc && !effectiveQuery,
     staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
   });
   const textQuery = useQuery({
     queryKey: ["places-text", effectiveQuery, userLoc?.lat, userLoc?.lng, regionCode],
@@ -102,12 +106,16 @@ function Home() {
       }),
     enabled: !!effectiveQuery,
     staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
   });
 
   const remoteList: NearbyRestaurant[] | undefined = effectiveQuery
     ? textQuery.data
     : nearbyQuery.data;
   const loadingRemote = effectiveQuery ? textQuery.isLoading : nearbyQuery.isLoading;
+  const remoteError = effectiveQuery ? textQuery.error : nearbyQuery.error;
+  const retryRemote = () => void (effectiveQuery ? textQuery.refetch() : nearbyQuery.refetch());
   const usingRemote = !!userLoc && !!remoteList;
 
   useEffect(() => {
