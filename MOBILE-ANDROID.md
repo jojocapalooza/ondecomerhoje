@@ -61,9 +61,15 @@ pacote.
 
 - **Um só plugin nativo** (`@capacitor/geolocation`). Removidos `app`,
   `browser`, `status-bar` e `assets`, que não eram usados.
-- **R8 + shrinkResources** ligados no debug e no release: classes e recursos
-  AndroidX não usados são removidos (as regras de `keep` do Capacitor ficam em
-  `proguard-rules.pro`).
+- **R8 + shrinkResources** ligados **apenas no release** (o Android Gradle
+  Plugin exige `minifyEnabled` para permitir `shrinkResources`; no debug os
+  dois ficam desligados para o build passar e ser rápido). As regras de `keep`
+  do Capacitor ficam em `proguard-rules.pro`.
+- **Gradle otimizado no CI**: `parallel`, `build-cache`, `daemon`,
+  `configuration-cache` e R8 full mode, mais cache de Bun/Gradle no GitHub
+  Actions.
+- **Permissões mínimas** garantidas no manifest: internet, estado da rede e
+  localização (fine/coarse).
 - **Só ABIs de celular real** (`arm64-v8a`, `armeabi-v7a`) — sem x86 de
   emulador.
 - **Só os idiomas usados** (`pt`, `pt-rBR`, `en`) nas bibliotecas.
