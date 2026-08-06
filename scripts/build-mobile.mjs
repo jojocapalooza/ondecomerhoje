@@ -104,8 +104,10 @@ async function main() {
     await rm(join(OUT, name), { recursive: true, force: true });
   }
   // Sourcemaps nunca são lidos dentro do app e pesam mais que o código.
-  for (const entry of await readdir(join(OUT, "assets"))) {
-    if (entry.endsWith(".map")) await rm(join(OUT, "assets", entry), { force: true });
+  if (existsSync(join(OUT, "assets"))) {
+    for (const entry of await readdir(join(OUT, "assets"))) {
+      if (entry.endsWith(".map")) await rm(join(OUT, "assets", entry), { force: true });
+    }
   }
 
   const kb = Math.round((await dirSize(OUT)) / 1024);
