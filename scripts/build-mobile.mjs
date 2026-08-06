@@ -8,11 +8,25 @@
 // aparelho; só as consultas de dados vão para a API publicada.
 import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, rm, readdir, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-const ROUTES = ["/", "/favoritos", "/trend", "/perfil"];
+// Só a raiz é pré-renderizada: dentro do APK o WebView sempre abre index.html
+// e a navegação entre telas é feita no cliente. Guardar uma cópia de HTML por
+// tela só inflaria o pacote com o mesmo conteúdo repetido.
+const ROUTES = ["/"];
+// Arquivos que não servem para nada dentro do APK.
+const DROP = ["_headers", "robots.txt", "sitemap.xml", "favoritos", "trend", "perfil"];
 const OUT = "dist/client";
+
+async function dirSize(dir) {
+  let total = 0;
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name);
+    total += entry.isDirectory() ? await dirSize(p) : (await stat(p)).size;
+  }
+  return total;
+}
 
 function run(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
