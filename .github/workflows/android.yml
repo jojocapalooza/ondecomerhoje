@@ -1,0 +1,46 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Instalar dependências
+        run: bun install
+
+      - name: Gerar pacote web embutido
+        run: bun run mobile:web
+
+      - name: Criar projeto Android
+        run: bunx cap add android
+
+      - name: Sincronizar Capacitor
+        run: bunx cap sync android
+
+      - name: Build do APK (debug)
+        run: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
+
+      - name: Publicar APK como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: onde-comer-hoje-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
