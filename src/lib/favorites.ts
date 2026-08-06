@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { isNativeApp } from "./mobile-bridge";
 
 const KEY = "och_favorites";
 
@@ -57,12 +58,42 @@ export type UserLocation = { lat: number; lng: number } | null;
 export function useUserLocation(): UserLocation {
   const [loc, setLoc] = useState<UserLocation>(null);
   useEffect(() => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (p) => setLoc({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      () => setLoc(null),
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
-    );
+    let cancelled = false;
+    const set = (lat: number, lng: number) => {
+      if (!cancelled) setLoc({ lat, lng });
+    };
+
+    async function locate() {
+      // No app Android, o GPS vem do próprio aparelho via plugin nativo
+      // (pede a permissão do sistema). No navegador usamos a API padrão.
+      if (isNativeApp()) {
+        try {
+          const { Geolocation } = await import("@capacitor/geolocation");
+          const perm = await Geolocation.requestPermissions();
+          if (perm.location === "denied" && perm.coarseLocation === "denied") return;
+          const p = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 5 * 60 * 1000,
+          });
+          set(p.coords.latitude, p.coords.longitude);
+          return;
+        } catch {
+          // cai no navigator abaixo
+        }
+      }
+      if (typeof navigator === "undefined" || !navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        (p) => set(p.coords.latitude, p.coords.longitude),
+        () => {},
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
+      );
+    }
+
+    void locate();
+    return () => {
+      cancelled = true;
+    };
   }, []);
   return loc;
 }

@@ -11,6 +11,11 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "../components/AppShell";
+import { installMobileBridge } from "../lib/mobile-bridge";
+
+// No APK Android, redireciona só as chamadas de dados para a API publicada.
+// No navegador é um no-op.
+installMobileBridge();
 
 function NotFoundComponent() {
   return (
