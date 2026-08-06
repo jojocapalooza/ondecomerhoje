@@ -36,8 +36,15 @@ jobs:
         run: node scripts/android-slim.mjs
 
       - name: Restaurar keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "keystore restaurado"
+          else
+            echo "sem keystore: o release sairá sem assinatura"
+          fi
 
       - name: Configurar assinatura
         env:
