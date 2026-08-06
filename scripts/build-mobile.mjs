@@ -68,7 +68,17 @@ async function main() {
     console.log(`capturado ${route} -> ${file}`);
   }
 
-  console.log("\nPacote web pronto em dist/client. Agora: bun run android:sync");
+  for (const name of DROP) {
+    await rm(join(OUT, name), { recursive: true, force: true });
+  }
+  // Sourcemaps nunca são lidos dentro do app e pesam mais que o código.
+  for (const entry of await readdir(join(OUT, "assets"))) {
+    if (entry.endsWith(".map")) await rm(join(OUT, "assets", entry), { force: true });
+  }
+
+  const kb = Math.round((await dirSize(OUT)) / 1024);
+  console.log(`\nPacote web pronto em dist/client — ${kb} KB.`);
+  console.log("Agora: bun run android:sync (e scripts/android-slim.mjs antes do gradlew)");
 }
 
 main().catch((err) => {
