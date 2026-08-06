@@ -12,6 +12,7 @@ import { readFile, writeFile, access } from "node:fs/promises";
 
 const GRADLE = "android/app/build.gradle";
 const PROGUARD = "android/app/proguard-rules.pro";
+const GRADLE_PROPS = "android/gradle.properties";
 
 const SLIM_BLOCK = `
     // --- slim APK (gerado por scripts/android-slim.mjs) ---
@@ -23,9 +24,11 @@ const SLIM_BLOCK = `
     }
     buildTypes {
         debug {
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // O AGP exige minifyEnabled para usar shrinkResources; no debug
+            // deixamos os dois desligados (build rápido e instalável).
+            debuggable true
+            minifyEnabled false
+            shrinkResources false
         }
         release {
             minifyEnabled true
@@ -68,6 +71,38 @@ async function exists(p) {
   }
 }
 
+// Remove o bloco buildTypes { ... } que o Capacitor gera, para que as nossas
+// definições não sejam sobrescritas (o release do template usa
+// minifyEnabled false, o que quebra o shrinkResources).
+function stripBuildTypes(source) {
+  const marker = /\n[ \t]*buildTypes\s*\{/.exec(source);
+  if (!marker) return source;
+  const start = marker.index;
+  let i = source.indexOf("{", start);
+  let depth = 0;
+  for (; i < source.length; i++) {
+    const c = source[i];
+    if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) break;
+    }
+  }
+  if (depth !== 0) return source;
+  return source.slice(0, start) + source.slice(i + 1);
+}
+
+const PROPS = [
+  ["org.gradle.parallel", "true"],
+  ["org.gradle.caching", "true"],
+  ["org.gradle.daemon", "true"],
+  ["org.gradle.configuration-cache", "true"],
+  ["org.gradle.jvmargs", "-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"],
+  ["android.nonTransitiveRClass", "true"],
+  ["android.enableR8.fullMode", "true"],
+  ["android.defaults.buildfeatures.buildconfig", "false"],
+];
+
 async function main() {
   if (!(await exists(GRADLE))) {
     console.error(`não encontrei ${GRADLE}. Rode antes: bunx cap add android`);
@@ -78,6 +113,7 @@ async function main() {
   if (gradle.includes("slim APK")) {
     console.log("build.gradle já está enxugado.");
   } else {
+    gradle = stripBuildTypes(gradle);
     // insere dentro do bloco android { ... } (primeira ocorrência)
     const idx = gradle.indexOf("android {");
     if (idx === -1) throw new Error("bloco android { } não encontrado em build.gradle");
@@ -91,6 +127,19 @@ async function main() {
   if (!rules.includes("slim APK")) {
     await writeFile(PROGUARD, rules + KEEP_RULES, "utf8");
     console.log("proguard-rules.pro com as regras de keep do Capacitor.");
+  }
+
+  // Gradle mais rápido no CI: cache de build, execução paralela e daemon.
+  if (await exists(GRADLE_PROPS)) {
+    let props = await readFile(GRADLE_PROPS, "utf8");
+    for (const [key, value] of PROPS) {
+      const re = new RegExp(`^${key.replace(/\./g, "\\.")}=.*$`, "m");
+      props = re.test(props)
+        ? props.replace(re, `${key}=${value}`)
+        : `${props.trimEnd()}\n${key}=${value}\n`;
+    }
+    await writeFile(GRADLE_PROPS, props, "utf8");
+    console.log("gradle.properties otimizado (parallel, caching, daemon, R8 full mode).");
   }
 }
 
