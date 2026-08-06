@@ -32,6 +32,7 @@ bun install
 bun run mobile:web      # build + gera as telas embutidas em dist/client
 bun run android:add     # só na primeira vez: cria a pasta android/
 bun run android:sync    # copia o web para o projeto nativo
+bun run android:slim    # enxuga o projeto nativo (R8, ABIs, idiomas)
 bun run android:open    # abre no Android Studio (Run ▶ instala no celular)
 ```
 
@@ -50,7 +51,29 @@ bun run android:apk
   (`/_serverFn/*`, `/api/*`) para a API publicada; HTML, CSS, JS e ícones vêm
   de dentro do APK.
 - `scripts/build-mobile.mjs` renderiza as telas principais (`/`, `/favoritos`,
-  `/trend`, `/perfil`) em HTML estático para abrir instantaneamente offline.
+  ...) — hoje só a raiz, porque o WebView sempre abre `index.html` e o resto da
+  navegação é feita no cliente.
+
+## Por que o APK é pequeno
+
+A meta é a mesma de um binário único e leve: nada que não é usado entra no
+pacote.
+
+- **Um só plugin nativo** (`@capacitor/geolocation`). Removidos `app`,
+  `browser`, `status-bar` e `assets`, que não eram usados.
+- **R8 + shrinkResources** ligados no debug e no release: classes e recursos
+  AndroidX não usados são removidos (as regras de `keep` do Capacitor ficam em
+  `proguard-rules.pro`).
+- **Só ABIs de celular real** (`arm64-v8a`, `armeabi-v7a`) — sem x86 de
+  emulador.
+- **Só os idiomas usados** (`pt`, `pt-rBR`, `en`) nas bibliotecas.
+- **Sem sourcemaps, sem `_headers`/`robots.txt`/`sitemap`, sem HTML duplicado
+  por rota** dentro do APK; o pacote web fica em torno de **620 KB**
+  (comprimido no APK, bem menos).
+- **Sem `dependenciesInfo`** e sem metadados de build no pacote.
+
+Tudo isso é aplicado por `scripts/android-slim.mjs`, que roda automaticamente
+no workflow e via `bun run android:apk`.
 
 ## Depois de mudar o app
 
