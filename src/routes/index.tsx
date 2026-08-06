@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Filters, defaultFilters, type FilterState } from "@/components/Filters";
 import { RestaurantCard } from "@/components/RestaurantCard";
+import { LocationBar } from "@/components/LocationBar";
 import { restaurants, SPECIAL_CATEGORIES, CATEGORY_QUERY_TERMS } from "@/lib/restaurants";
 import { getSearchHistory, pushSearch, clearSearchHistory, useUserLocation, haversineKm } from "@/lib/favorites";
 import {
@@ -363,6 +364,7 @@ function Home() {
       <section className="mx-auto max-w-7xl px-4 py-8">
         <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
           <aside className="space-y-4">
+            <LocationBar geo={geo} cityFromGps={geoQuery.data?.city} />
             <Filters value={filters} onChange={setFilters} />
           </aside>
           <div>
@@ -405,6 +407,18 @@ function Home() {
                 ))}
               </div>
             </div>
+
+            {remoteError && (
+              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+                <p className="flex-1 text-sm">
+                  Não foi possível buscar restaurantes agora. Verifique sua conexão e tente
+                  novamente — enquanto isso mostramos uma prévia local.
+                </p>
+                <Button size="sm" variant="outline" onClick={retryRemote}>
+                  Tentar novamente
+                </Button>
+              </div>
+            )}
 
             {filtered.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border p-12 text-center">
