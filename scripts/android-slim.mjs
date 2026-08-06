@@ -13,6 +13,7 @@ import { readFile, writeFile, access } from "node:fs/promises";
 const GRADLE = "android/app/build.gradle";
 const PROGUARD = "android/app/proguard-rules.pro";
 const GRADLE_PROPS = "android/gradle.properties";
+const MANIFEST = "android/app/src/main/AndroidManifest.xml";
 
 const SLIM_BLOCK = `
     // --- slim APK (gerado por scripts/android-slim.mjs) ---
@@ -102,6 +103,28 @@ const PROPS = [
   ["android.enableR8.fullMode", "true"],
 ];
 
+// Permissões mínimas: internet, estado da rede e localização (GPS do aparelho).
+const PERMISSIONS = [
+  "android.permission.INTERNET",
+  "android.permission.ACCESS_NETWORK_STATE",
+  "android.permission.ACCESS_FINE_LOCATION",
+  "android.permission.ACCESS_COARSE_LOCATION",
+];
+
+async function ensurePermissions() {
+  if (!(await exists(MANIFEST))) return;
+  let xml = await readFile(MANIFEST, "utf8");
+  const missing = PERMISSIONS.filter((p) => !xml.includes(`"${p}"`));
+  if (!missing.length) {
+    console.log("AndroidManifest.xml já tem as permissões necessárias.");
+    return;
+  }
+  const lines = missing.map((p) => `    <uses-permission android:name="${p}" />`).join("\n");
+  xml = xml.replace("</manifest>", `${lines}\n</manifest>`);
+  await writeFile(MANIFEST, xml, "utf8");
+  console.log(`AndroidManifest.xml: adicionadas ${missing.length} permissão(ões).`);
+}
+
 async function main() {
   if (!(await exists(GRADLE))) {
     console.error(`não encontrei ${GRADLE}. Rode antes: bunx cap add android`);
@@ -140,6 +163,8 @@ async function main() {
     await writeFile(GRADLE_PROPS, props, "utf8");
     console.log("gradle.properties otimizado (parallel, caching, daemon, R8 full mode).");
   }
+
+  await ensurePermissions();
 }
 
 main().catch((err) => {
