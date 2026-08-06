@@ -80,3 +80,86 @@ no workflow e via `bun run android:apk`.
 Mudanças visuais exigem gerar um APK novo (`bun run mobile:web` +
 `android:sync`). Mudanças de dados/API entram sozinhas, porque vêm do site
 publicado.
+---
+
+## Passo a passo: gerar o APK (debug, para instalar no seu celular)
+
+### Caminho A — na nuvem, sem instalar nada
+
+1. Conecte o projeto ao GitHub: menu **+ → GitHub → Connect project**.
+2. Vá em **Actions → Android APK → Run workflow** (ou apenas dê um push na `main`).
+3. Espere ~6–10 min. Ao terminar, abra o run → **Artifacts** →
+   `onde-comer-hoje-apk` → baixe o `.zip` e extraia o `app-debug.apk`.
+4. Envie o arquivo para o celular (Drive, cabo, Telegram…), toque nele e
+   permita **"instalar apps de fontes desconhecidas"**.
+
+### Caminho B — no seu computador
+
+Requisitos: **JDK 21** e **Android SDK** (Android Studio já inclui os dois).
+
+```bash
+bun install
+bun run android:add     # só a primeira vez
+bun run android:apk     # build web + sync + slim + gradlew assembleDebug
+```
+Resultado: `android/app/build/outputs/apk/debug/app-debug.apk`
+
+---
+
+## Passo a passo: gerar o AAB (release assinado, para a Play Store)
+
+A Play Store **só aceita AAB assinado com a sua chave de release**. Faça uma vez:
+
+### 1. Criar a chave (keystore)
+
+```bash
+keytool -genkey -v -keystore release.jks -keyalg RSA -keysize 2048 \
+  -validity 10000 -alias ondecomerhoje
+```
+Guarde o `release.jks` e as senhas em local seguro: **perder essa chave impede
+atualizar o app na loja depois**.
+
+### 2. Build local do AAB
+
+```bash
+export ANDROID_KEYSTORE_PATH=./release.jks
+export ANDROID_KEYSTORE_PASSWORD='sua-senha'
+export ANDROID_KEY_ALIAS=ondecomerhoje
+export ANDROID_KEY_PASSWORD='sua-senha'
+
+bun run android:aab       # AAB  -> android/app/build/outputs/bundle/release/app-release.aab
+bun run android:release   # APK  -> android/app/build/outputs/apk/release/app-release.apk
+```
+
+### 3. Build na nuvem do AAB (GitHub Actions)
+
+1. Converta a chave em texto:
+   `base64 -w0 release.jks > release.b64` (no macOS: `base64 -i release.jks -o release.b64`).
+2. No GitHub, em **Settings → Secrets and variables → Actions → New secret**, crie:
+   - `ANDROID_KEYSTORE_BASE64` → conteúdo do `release.b64`
+   - `ANDROID_KEYSTORE_PASSWORD`
+   - `ANDROID_KEY_ALIAS`
+   - `ANDROID_KEY_PASSWORD`
+3. Rode **Actions → Android Release (APK + AAB) → Run workflow**
+   (ou crie uma tag `v1.0.0` e dê push).
+4. Baixe o artefato `onde-comer-hoje-release` — contém o `.apk` e o `.aab`.
+
+Sem os secrets o workflow ainda roda, mas o release sai **sem assinatura**
+(serve para testar tamanho, não para a loja).
+
+### 4. Enviar para a Play Store
+
+1. Crie a conta de desenvolvedor no **Google Play Console** (taxa única de US$ 25).
+2. **Criar app** → nome "Onde Comer Hoje", idioma pt-BR, app gratuito.
+3. Em **Produção → Criar novo lançamento**, faça upload do `app-release.aab`.
+4. Preencha o obrigatório: ícone 512×512, capa 1024×500, 2+ screenshots,
+   descrição, política de privacidade (URL pública) e o formulário de
+   **Segurança dos dados** — declare o uso de **localização precisa** para
+   sugerir restaurantes próximos.
+5. Envie para revisão (costuma levar de 1 a 7 dias).
+
+### Versão do app
+
+Antes de cada envio novo à loja, aumente em `android/app/build.gradle`:
+`versionCode` (+1, inteiro) e `versionName` (ex.: `1.0.1`). O Play recusa
+uploads com `versionCode` repetido.
