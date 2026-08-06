@@ -87,7 +87,11 @@ export function LocationBar({
               <LocateFixed className="mr-1.5 h-3.5 w-3.5" /> Tentar de novo
             </Button>
           )}
-          <Button size="sm" variant={needsFallback ? "default" : "ghost"} onClick={() => setOpen((v) => !v)}>
+          <Button
+            size="sm"
+            variant={needsFallback ? "default" : "ghost"}
+            onClick={() => setOpen((v) => !v)}
+          >
             {open ? "Fechar" : "Informar endereço"}
           </Button>
         </div>

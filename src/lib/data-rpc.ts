@@ -26,9 +26,7 @@ async function remoteCall<TOut>(fn: string, data: unknown): Promise<TOut> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fn, data }),
   });
-  const payload = (await res.json().catch(() => null)) as
-    | { result?: TOut; error?: string }
-    | null;
+  const payload = (await res.json().catch(() => null)) as { result?: TOut; error?: string } | null;
   if (!res.ok || !payload || payload.error) {
     throw new Error(payload?.error ?? `Falha na consulta (${res.status})`);
   }
@@ -38,8 +36,7 @@ async function remoteCall<TOut>(fn: string, data: unknown): Promise<TOut> {
 function useDataFn<TIn, TOut>(name: string, fn: unknown): Caller<TIn, TOut> {
   const local = useServerFn(fn as never) as unknown as Caller<TIn, TOut>;
   return useCallback(
-    (opts: { data: TIn }) =>
-      isNativeApp() ? remoteCall<TOut>(name, opts.data) : local(opts),
+    (opts: { data: TIn }) => (isNativeApp() ? remoteCall<TOut>(name, opts.data) : local(opts)),
     [local, name],
   );
 }
@@ -93,8 +90,8 @@ export function useGetPlaceDetailsById() {
 }
 
 export function useGetRestaurantPlace() {
-  return useDataFn<
-    { query: string; latitude?: number; longitude?: number },
-    PlaceData | null
-  >("getRestaurantPlace", getRestaurantPlace);
+  return useDataFn<{ query: string; latitude?: number; longitude?: number }, PlaceData | null>(
+    "getRestaurantPlace",
+    getRestaurantPlace,
+  );
 }

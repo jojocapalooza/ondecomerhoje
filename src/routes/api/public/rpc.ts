@@ -57,17 +57,12 @@ export const Route = createFileRoute("/api/public/rpc")({
         const fn = payload.fn;
         if (!fn || !(fn in HANDLERS)) return json({ error: "unknown_fn" }, 400);
         try {
-          const handler = HANDLERS[fn as RpcName] as (opts: {
-            data: unknown;
-          }) => Promise<unknown>;
+          const handler = HANDLERS[fn as RpcName] as (opts: { data: unknown }) => Promise<unknown>;
           const result = await handler({ data: payload.data });
           return json({ result: result ?? null });
         } catch (error) {
           console.error(`[rpc:${fn}]`, error);
-          return json(
-            { error: error instanceof Error ? error.message : "unexpected_error" },
-            500,
-          );
+          return json({ error: error instanceof Error ? error.message : "unexpected_error" }, 500);
         }
       },
     },
