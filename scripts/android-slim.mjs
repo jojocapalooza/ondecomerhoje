@@ -100,7 +100,6 @@ const PROPS = [
   ["org.gradle.jvmargs", "-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"],
   ["android.nonTransitiveRClass", "true"],
   ["android.enableR8.fullMode", "true"],
-  ["android.defaults.buildfeatures.buildconfig", "false"],
 ];
 
 async function main() {
