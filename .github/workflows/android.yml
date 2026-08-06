@@ -2,8 +2,17 @@ name: Android APK
 
 on:
   push:
+    branches:
+      - main
+      - "edit/**"
+      - "feature/**"
+  pull_request:
     branches: [main]
   workflow_dispatch:
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   apk:
