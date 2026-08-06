@@ -450,6 +450,46 @@ export const reverseGeocode = createServerFn({ method: "POST" })
     };
   });
 
+// Geocodificação direta: transforma um endereço/cidade digitado em coordenadas.
+// É o fallback quando o GPS é negado, indisponível ou impreciso.
+export const geocodeAddress = createServerFn({ method: "POST" })
+  .inputValidator((input: { address: string; regionCode?: string }) => input)
+  .handler(async ({ data }): Promise<UserPlaceInfo | null> => {
+    const address = data.address.trim();
+    if (!address) return null;
+    const region = data.regionCode ? `&region=${encodeURIComponent(data.regionCode)}` : "";
+    const res = await gatewayFetch(
+      `/maps/api/geocode/json?address=${encodeURIComponent(address)}&language=pt-BR${region}`,
+    );
+    if (!res.ok) {
+      console.error(`[geocode-address] failed [${res.status}]: ${await res.text()}`);
+      throw new Error("Não foi possível localizar esse endereço agora.");
+    }
+    const json = (await res.json()) as {
+      status?: string;
+      results?: Array<{
+        formatted_address?: string;
+        geometry?: { location?: { lat: number; lng: number } };
+        address_components?: Array<{ long_name: string; short_name: string; types: string[] }>;
+      }>;
+    };
+    const first = json.results?.[0];
+    const loc = first?.geometry?.location;
+    if (!loc) return null;
+    const comps = first?.address_components ?? [];
+    const pick = (t: string) => comps.find((c) => c.types.includes(t));
+    const country = pick("country");
+    return {
+      city: pick("locality")?.long_name ?? pick("administrative_area_level_2")?.long_name,
+      state: pick("administrative_area_level_1")?.long_name,
+      country: country?.long_name,
+      countryCode: country?.short_name,
+      formatted: first?.formatted_address,
+      latitude: loc.lat,
+      longitude: loc.lng,
+    };
+  });
+
 // Busca detalhes por placeId (para página de detalhe quando id não vem do mock)
 export const getPlaceDetailsById = createServerFn({ method: "POST" })
   .inputValidator((input: { placeId: string }) => input)
