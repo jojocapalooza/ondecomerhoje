@@ -255,24 +255,23 @@ function Home() {
     <div>
       {/* Hero */}
       <section className="relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
-        <div className="mx-auto max-w-7xl px-4 py-12 md:py-20 text-primary-foreground">
+        <div className="mx-auto max-w-7xl px-4 py-8 md:py-12 text-primary-foreground">
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs backdrop-blur">
-              <TrendingUp className="h-3.5 w-3.5" /> Descoberta inteligente de restaurantes
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] backdrop-blur">
+              <TrendingUp className="h-3 w-3" /> Restaurantes perto de você
             </div>
-            <h1 className="mt-4 text-3xl md:text-5xl font-bold tracking-tight">Onde você quer comer hoje?</h1>
-            <p className="mt-3 text-primary-foreground/85 md:text-lg">
-              Busque por nome, culinária ou localidade. Encontre o restaurante certo em segundos.
-            </p>
+            <h1 className="mt-3 text-2xl md:text-3xl font-bold tracking-tight">
+              Onde comer hoje?
+            </h1>
           </div>
 
           {/* Tabs */}
-          <div className="mt-8 inline-flex rounded-full bg-white/10 p-1 backdrop-blur">
+          <div className="mt-4 inline-flex rounded-full bg-white/10 p-1 backdrop-blur">
             {(["restaurante", "localidade"] as Tab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`rounded-full px-5 py-2 text-sm font-medium capitalize transition-colors ${
+                className={`rounded-full px-4 py-1.5 text-xs font-medium capitalize transition-colors ${
                   tab === t ? "bg-background text-foreground" : "text-primary-foreground/80 hover:text-primary-foreground"
                 }`}
               >
@@ -285,9 +284,9 @@ function Home() {
           <div className="relative mt-3 max-w-2xl">
             {tab === "restaurante" ? (
               <div className="relative">
-                <div className="flex items-center gap-2 rounded-2xl bg-background p-2 shadow-lg">
+                <div className="flex items-center gap-2 rounded-2xl bg-background p-1.5 shadow-lg">
                   <div className="pl-2 text-muted-foreground">
-                    <Search className="h-5 w-5" />
+                    <Search className="h-4 w-4" />
                   </div>
                   <Input
                     ref={inputRef}
@@ -296,19 +295,21 @@ function Home() {
                     onFocus={() => setShowAuto(true)}
                     onBlur={() => setTimeout(() => setShowAuto(false), 150)}
                     onKeyDown={(e) => e.key === "Enter" && submitSearch()}
-                    placeholder="Buscar por restaurante, prato ou categoria (ex.: sushi, feijoada, vegan)…"
-                    className="h-11 flex-1 border-0 bg-transparent focus-visible:ring-0 shadow-none text-base"
+                    placeholder="Buscar o que você quiser"
+                    className="h-9 flex-1 border-0 bg-transparent focus-visible:ring-0 shadow-none text-sm"
                   />
                   <button
                     onClick={startVoice}
                     aria-label="Busca por voz"
-                    className={`grid h-10 w-10 place-items-center rounded-xl transition-colors ${
+                    className={`grid h-9 w-9 place-items-center rounded-xl transition-colors ${
                       listening ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-muted text-foreground hover:bg-muted/80"
                     }`}
                   >
-                    <Mic className="h-5 w-5" />
+                    <Mic className="h-4 w-4" />
                   </button>
-                  <Button onClick={() => submitSearch()} className="h-10 rounded-xl">Buscar</Button>
+                  <Button onClick={() => submitSearch()} className="h-9 rounded-xl text-sm">
+                    Buscar
+                  </Button>
                 </div>
                 {showAuto && (suggestions.length > 0 || history.length > 0) && (
                   <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl">
