@@ -14,7 +14,8 @@
     "android:add": "cap add android",
     "android:sync": "cap sync android",
     "android:open": "cap open android",
-    "android:apk": "node scripts/build-mobile.mjs && cap sync android && cd android && ./gradlew assembleDebug"
+    "android:apk": "node scripts/build-mobile.mjs && cap sync android && node scripts/android-slim.mjs && cd android && ./gradlew assembleDebug",
+    "android:slim": "node scripts/android-slim.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
