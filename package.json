@@ -15,7 +15,10 @@
     "android:sync": "cap sync android",
     "android:open": "cap open android",
     "android:apk": "node scripts/build-mobile.mjs && cap sync android && node scripts/android-slim.mjs && cd android && ./gradlew assembleDebug",
-    "android:slim": "node scripts/android-slim.mjs"
+    "android:slim": "node scripts/android-slim.mjs",
+    "android:signing": "node scripts/android-signing.mjs",
+    "android:release": "node scripts/build-mobile.mjs && cap sync android && node scripts/android-slim.mjs && node scripts/android-signing.mjs && cd android && ./gradlew assembleRelease",
+    "android:aab": "node scripts/build-mobile.mjs && cap sync android && node scripts/android-slim.mjs && node scripts/android-signing.mjs && cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
