@@ -7,12 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Filters, defaultFilters, type FilterState } from "@/components/Filters";
 import { RestaurantCard } from "@/components/RestaurantCard";
+import { LocationBar } from "@/components/LocationBar";
 import { restaurants, SPECIAL_CATEGORIES, CATEGORY_QUERY_TERMS } from "@/lib/restaurants";
 import { getSearchHistory, pushSearch, clearSearchHistory, useUserLocation, haversineKm } from "@/lib/favorites";
 import {
   searchNearbyRestaurants,
   searchRestaurantsByText,
   reverseGeocode,
+  geocodeAddress,
   type NearbyRestaurant,
 } from "@/lib/google-places.functions";
 
@@ -34,7 +36,8 @@ function Home() {
   const [visible, setVisible] = useState(9);
   const [showAuto, setShowAuto] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const userLoc = useUserLocation();
+  const geo = useUserLocation();
+  const userLoc = geo.location;
   const fetchNearby = useServerFn(searchNearbyRestaurants);
   const fetchText = useServerFn(searchRestaurantsByText);
   const fetchGeo = useServerFn(reverseGeocode);
@@ -88,6 +91,8 @@ function Home() {
       }),
     enabled: !!userLoc && !effectiveQuery,
     staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
   });
   const textQuery = useQuery({
     queryKey: ["places-text", effectiveQuery, userLoc?.lat, userLoc?.lng, regionCode],
@@ -102,12 +107,16 @@ function Home() {
       }),
     enabled: !!effectiveQuery,
     staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
   });
 
   const remoteList: NearbyRestaurant[] | undefined = effectiveQuery
     ? textQuery.data
     : nearbyQuery.data;
   const loadingRemote = effectiveQuery ? textQuery.isLoading : nearbyQuery.isLoading;
+  const remoteError = effectiveQuery ? textQuery.error : nearbyQuery.error;
+  const retryRemote = () => void (effectiveQuery ? textQuery.refetch() : nearbyQuery.refetch());
   const usingRemote = !!userLoc && !!remoteList;
 
   useEffect(() => {
@@ -353,7 +362,8 @@ function Home() {
 
       {/* Body */}
       <section className="mx-auto max-w-7xl px-4 py-8">
-        <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+        <LocationBar geo={geo} cityFromGps={geoQuery.data?.city} />
+        <div className="mt-6 grid gap-6 lg:grid-cols-[300px_1fr]">
           <aside className="space-y-4">
             <Filters value={filters} onChange={setFilters} />
           </aside>
@@ -397,6 +407,18 @@ function Home() {
                 ))}
               </div>
             </div>
+
+            {remoteError && (
+              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+                <p className="flex-1 text-sm">
+                  Não foi possível buscar restaurantes agora. Verifique sua conexão e tente
+                  novamente — enquanto isso mostramos uma prévia local.
+                </p>
+                <Button size="sm" variant="outline" onClick={retryRemote}>
+                  Tentar novamente
+                </Button>
+              </div>
+            )}
 
             {filtered.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border p-12 text-center">

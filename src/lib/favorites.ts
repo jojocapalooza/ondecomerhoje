@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { isNativeApp } from "./mobile-bridge";
 
 const KEY = "och_favorites";
@@ -55,47 +55,174 @@ export function clearSearchHistory() {
 // ---------- Geolocalização do usuário ----------
 export type UserLocation = { lat: number; lng: number } | null;
 
-export function useUserLocation(): UserLocation {
-  const [loc, setLoc] = useState<UserLocation>(null);
-  useEffect(() => {
-    let cancelled = false;
-    const set = (lat: number, lng: number) => {
-      if (!cancelled) setLoc({ lat, lng });
-    };
+/** Origem da localização em uso: GPS do aparelho ou endereço digitado. */
+export type LocationSource = "gps" | "manual" | "cache";
+export type LocationStatus = "idle" | "locating" | "ready" | "denied" | "unsupported" | "error";
 
-    async function locate() {
-      // No app Android, o GPS vem do próprio aparelho via plugin nativo
-      // (pede a permissão do sistema). No navegador usamos a API padrão.
+const LOC_KEY = "och_last_location";
+const LOC_TTL = 24 * 60 * 60 * 1000; // 1 dia: evita pedir GPS a cada visita
+
+type StoredLocation = {
+  lat: number;
+  lng: number;
+  label?: string;
+  source: LocationSource;
+  at: number;
+};
+
+function readStoredLocation(): StoredLocation | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LOC_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as StoredLocation;
+    if (typeof v?.lat !== "number" || typeof v?.lng !== "number") return null;
+    // Endereço escolhido manualmente não expira; GPS em cache expira em 1 dia.
+    if (v.source !== "manual" && Date.now() - (v.at ?? 0) > LOC_TTL) return null;
+    return v;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredLocation(v: StoredLocation) {
+  try {
+    localStorage.setItem(LOC_KEY, JSON.stringify(v));
+  } catch {
+    // localStorage cheio ou bloqueado: seguimos só em memória
+  }
+}
+
+export type UseUserLocation = {
+  location: UserLocation;
+  status: LocationStatus;
+  source: LocationSource | null;
+  label: string | null;
+  error: string | null;
+  /** Pede o GPS novamente (usado no botão "tentar de novo"). */
+  requestGps: () => void;
+  /** Define manualmente a localização (fallback quando não há GPS). */
+  setManualLocation: (lat: number, lng: number, label?: string) => void;
+  /** Volta a usar o GPS e descarta o endereço manual. */
+  clearManualLocation: () => void;
+};
+
+export function useUserLocation(): UseUserLocation {
+  const [location, setLocation] = useState<UserLocation>(null);
+  const [status, setStatus] = useState<LocationStatus>("idle");
+  const [source, setSource] = useState<LocationSource | null>(null);
+  const [label, setLabel] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const cancelled = useRef(false);
+
+  const apply = useCallback(
+    (lat: number, lng: number, src: LocationSource, lbl?: string, persist = true) => {
+      if (cancelled.current) return;
+      setLocation({ lat, lng });
+      setSource(src);
+      setLabel(lbl ?? null);
+      setStatus("ready");
+      setError(null);
+      if (persist) writeStoredLocation({ lat, lng, label: lbl, source: src, at: Date.now() });
+    },
+    [],
+  );
+
+  const requestGps = useCallback(async () => {
+    setError(null);
+    setStatus("locating");
+    try {
+      // No app Android o GPS vem do aparelho via plugin nativo (permissão do
+      // sistema). No navegador usamos a API padrão.
       if (isNativeApp()) {
         try {
           const { Geolocation } = await import("@capacitor/geolocation");
           const perm = await Geolocation.requestPermissions();
-          if (perm.location === "denied" && perm.coarseLocation === "denied") return;
+          if (perm.location === "denied" && perm.coarseLocation === "denied") {
+            setStatus("denied");
+            setError("Permissão de localização negada. Informe sua cidade ou endereço.");
+            return;
+          }
           const p = await Geolocation.getCurrentPosition({
             enableHighAccuracy: false,
             timeout: 10000,
             maximumAge: 5 * 60 * 1000,
           });
-          set(p.coords.latitude, p.coords.longitude);
+          apply(p.coords.latitude, p.coords.longitude, "gps");
           return;
         } catch {
           // cai no navigator abaixo
         }
       }
-      if (typeof navigator === "undefined" || !navigator.geolocation) return;
+      if (typeof navigator === "undefined" || !navigator.geolocation) {
+        setStatus("unsupported");
+        setError("Este dispositivo não fornece localização. Informe sua cidade ou endereço.");
+        return;
+      }
       navigator.geolocation.getCurrentPosition(
-        (p) => set(p.coords.latitude, p.coords.longitude),
-        () => {},
+        (p) => apply(p.coords.latitude, p.coords.longitude, "gps"),
+        (err) => {
+          if (cancelled.current) return;
+          const denied = err.code === err.PERMISSION_DENIED;
+          setStatus(denied ? "denied" : "error");
+          setError(
+            denied
+              ? "Permissão de localização negada. Informe sua cidade ou endereço."
+              : "Não conseguimos obter sua localização. Informe sua cidade ou endereço.",
+          );
+        },
         { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
       );
+    } catch {
+      if (!cancelled.current) {
+        setStatus("error");
+        setError("Não conseguimos obter sua localização. Informe sua cidade ou endereço.");
+      }
     }
+  }, [apply]);
 
-    void locate();
+  useEffect(() => {
+    cancelled.current = false;
+    const stored = readStoredLocation();
+    if (stored) {
+      // Mostra os resultados na hora com a última posição conhecida (cache)…
+      apply(stored.lat, stored.lng, stored.source, stored.label, false);
+      // …e só volta ao GPS se a origem não foi uma escolha manual.
+      if (stored.source !== "manual") void requestGps();
+    } else {
+      void requestGps();
+    }
     return () => {
-      cancelled = true;
+      cancelled.current = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return loc;
+
+  const setManualLocation = useCallback(
+    (lat: number, lng: number, lbl?: string) => apply(lat, lng, "manual", lbl),
+    [apply],
+  );
+
+  const clearManualLocation = useCallback(() => {
+    try {
+      localStorage.removeItem(LOC_KEY);
+    } catch {
+      /* ignore */
+    }
+    setLabel(null);
+    void requestGps();
+  }, [requestGps]);
+
+  return {
+    location,
+    status,
+    source,
+    label,
+    error,
+    requestGps: () => void requestGps(),
+    setManualLocation,
+    clearManualLocation,
+  };
 }
 
 export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {

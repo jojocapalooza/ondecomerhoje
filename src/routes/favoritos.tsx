@@ -16,7 +16,7 @@ export const Route = createFileRoute("/favoritos")({
 
 function Favoritos() {
   const { ids } = useFavorites();
-  const loc = useUserLocation();
+  const loc = useUserLocation().location;
   const list = restaurants
     .filter((r) => ids.includes(r.id))
     .map((r) => ({

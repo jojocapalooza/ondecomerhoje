@@ -126,7 +126,7 @@ export const Route = createFileRoute("/trend")({
 });
 
 function Trend() {
-  const loc = useUserLocation();
+  const loc = useUserLocation().location;
   const fetchGeo = useServerFn(reverseGeocode);
   const fetchNearby = useServerFn(searchNearbyRestaurants);
 
