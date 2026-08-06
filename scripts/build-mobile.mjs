@@ -115,7 +115,11 @@ async function main() {
   console.log("Agora: bun run android:sync (e scripts/android-slim.mjs antes do gradlew)");
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main().then(
+  // o handler do servidor mantém timers abertos; encerramos explicitamente.
+  () => process.exit(0),
+  (err) => {
+    console.error(err);
+    process.exit(1);
+  },
+);
