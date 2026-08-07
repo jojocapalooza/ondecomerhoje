@@ -17,18 +17,17 @@ type SearchParams = {
 };
 
 const MODES: [SortMode, string][] = [
-  ["near", "Perto de mim"],
-  ["new", "Novos lugares"],
-  ["best", "Mais avaliados"],
-  ["stars", "Mais estrelas"],
-  ["reviews", "Mais comentados"],
+  ["stars", "Mais Estrelas"],
+  ["best", "Melhor Avaliado"],
+  ["reviews", "Mais Avaliações"],
+  ["near", "Mais Próximos"],
 ];
 
 export const Route = createFileRoute("/sugestoes")({
   validateSearch: (search: Record<string, unknown>): SearchParams => ({
-    modo: (["near", "new", "best", "stars", "reviews"].includes(String(search.modo))
+    modo: (["near", "best", "stars", "reviews"].includes(String(search.modo))
       ? String(search.modo)
-      : "best") as SortMode,
+      : "stars") as SortMode,
     q: typeof search.q === "string" && search.q ? search.q : undefined,
     culinaria:
       typeof search.culinaria === "string" && search.culinaria ? search.culinaria : undefined,

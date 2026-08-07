@@ -1,5 +1,7 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { Home, Heart, Search, TrendingUp, User, UtensilsCrossed } from "lucide-react";
+import { Home, Heart, Search, TrendingUp, User } from "lucide-react";
+
+import logo from "@/assets/logo-pin-garfo.png.asset.json";
 
 const tabs = [
   { to: "/", label: "Início", icon: Home },
@@ -16,9 +18,11 @@ export function AppShell() {
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:h-16">
           <Link to="/" className="flex items-center gap-2">
-            <div className="grid h-9 w-9 place-items-center rounded-xl text-primary-foreground" style={{ background: "var(--gradient-hero)" }}>
-              <UtensilsCrossed className="h-5 w-5" />
-            </div>
+            <img
+              src={logo.url}
+              alt="Onde Comer Hoje"
+              className="h-9 w-9 shrink-0 object-contain"
+            />
             <div className="leading-tight">
               <div className="font-bold tracking-tight">Onde Comer Hoje</div>
               <div className="-mt-0.5 hidden text-xs text-muted-foreground sm:block">

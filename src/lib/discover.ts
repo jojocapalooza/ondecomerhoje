@@ -178,7 +178,13 @@ export function sortDiscover(list: DiscoverItem[], mode: SortMode): DiscoverItem
   const arr = [...list];
   switch (mode) {
     case "stars":
-      return arr.sort((a, b) => b.rating - p(b.distance, 0.15) - (a.rating - p(a.distance, 0.15)));
+      // Prioridade absoluta à nota (o mais próximo de 5 estrelas), depois ao
+      // volume de avaliações 5 estrelas e por último à distância.
+      return arr.sort(
+        (a, b) =>
+          b.rating + Math.log(b.reviews + 1) * 0.06 - p(b.distance, 0.05) -
+          (a.rating + Math.log(a.reviews + 1) * 0.06 - p(a.distance, 0.05)),
+      );
     case "best":
       return arr.sort(
         (a, b) =>
@@ -203,6 +209,12 @@ export function sortDiscover(list: DiscoverItem[], mode: SortMode): DiscoverItem
         );
     case "near":
     default:
-      return arr.sort((a, b) => a.distance - b.distance);
+      // Distância em primeiro lugar, com um leve empurrão para os bem
+      // avaliados (nota média alta + muitas avaliações).
+      return arr.sort(
+        (a, b) =>
+          a.distance - (a.rating - 3) * 0.12 - Math.log(a.reviews + 1) * 0.04 -
+          (b.distance - (b.rating - 3) * 0.12 - Math.log(b.reviews + 1) * 0.04),
+      );
   }
 }
