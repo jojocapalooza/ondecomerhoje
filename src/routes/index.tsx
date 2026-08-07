@@ -226,18 +226,15 @@ function Home() {
       </div>
 
       {/* Atalhos rápidos */}
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {QUICK.map(({ modo, label, icon: Icon }) => (
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        {QUICK.map(({ modo, label }) => (
           <Link
             key={label}
             to="/sugestoes"
             search={{ modo }}
-            className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-border bg-card px-3 py-3.5 text-left transition-colors hover:bg-muted sm:flex-col sm:gap-2 sm:py-4 sm:text-center"
+            className="truncate rounded-full border border-border bg-card px-3 py-2 text-center text-xs font-medium transition-colors hover:bg-muted"
           >
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
-              <Icon className="h-4 w-4" />
-            </span>
-            <span className="min-w-0 truncate text-xs font-medium leading-tight">{label}</span>
+            {label}
           </Link>
         ))}
       </div>

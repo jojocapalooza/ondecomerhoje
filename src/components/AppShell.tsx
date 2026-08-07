@@ -4,7 +4,7 @@ import { Home, Heart, Search, TrendingUp, User } from "lucide-react";
 import logo from "@/assets/logo-pin-garfo.png.asset.json";
 
 const tabs = [
-  { to: "/", label: "Início", icon: Home },
+  { to: "/", label: "Home", icon: Home },
   { to: "/sugestoes", label: "Explorar", icon: Search },
   { to: "/trend", label: "Trend", icon: TrendingUp },
   { to: "/favoritos", label: "Favoritos", icon: Heart },
