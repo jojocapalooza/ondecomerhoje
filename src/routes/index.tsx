@@ -1,229 +1,104 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import {
-  useSearchNearbyRestaurants,
-  useSearchRestaurantsByText,
-  useReverseGeocode,
-} from "@/lib/data-rpc";
-import { Mic, Search, MapPin, Star, TrendingUp, Clock, Utensils } from "lucide-react";
+  Clock,
+  MapPin,
+  Mic,
+  Search,
+  Sparkles,
+  Star,
+  Utensils,
+  ChevronRight,
+} from "lucide-react";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Filters, defaultFilters, type FilterState } from "@/components/Filters";
-import { RestaurantCard } from "@/components/RestaurantCard";
 import { LocationBar } from "@/components/LocationBar";
-import { restaurants, SPECIAL_CATEGORIES, CATEGORY_QUERY_TERMS } from "@/lib/restaurants";
-import { getSearchHistory, pushSearch, clearSearchHistory, useUserLocation, haversineKm } from "@/lib/favorites";
-import {
-  searchNearbyRestaurants,
-  searchRestaurantsByText,
-  reverseGeocode,
-  geocodeAddress,
-  type NearbyRestaurant,
-} from "@/lib/google-places.functions";
+import { SuggestionCard } from "@/components/SuggestionCard";
+import { cuisines } from "@/lib/restaurants";
+import { useDiscover, sortDiscover, type SortMode } from "@/lib/discover";
+import { getSearchHistory, pushSearch, clearSearchHistory } from "@/lib/favorites";
 
 export const Route = createFileRoute("/")({
   component: Home,
+  head: () => ({
+    meta: [
+      { title: "Onde Comer Hoje — Restaurantes perto de você" },
+      {
+        name: "description",
+        content:
+          "Bora comer algo incrível hoje? Descubra restaurantes próximos, novidades, os mais avaliados e explore por culinária.",
+      },
+      { property: "og:title", content: "Onde Comer Hoje — Restaurantes perto de você" },
+      {
+        property: "og:description",
+        content: "Descubra restaurantes próximos, novidades e os mais avaliados da sua cidade.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
 });
 
-type Tab = "restaurante" | "localidade";
-type Sort = "stars" | "best" | "reviews" | "near";
+const QUICK: { modo: SortMode; label: string; icon: typeof MapPin }[] = [
+  { modo: "near", label: "Perto de mim", icon: MapPin },
+  { modo: "new", label: "Novos lugares", icon: Sparkles },
+  { modo: "reviews", label: "Por culinária", icon: Utensils },
+  { modo: "best", label: "Mais avaliados", icon: Star },
+];
+
+const CUISINE_EMOJI: Record<string, string> = {
+  Italiana: "🍝",
+  Japonesa: "🍣",
+  Brasileira: "🍖",
+  "Hambúrguer": "🍔",
+  Pizzaria: "🍕",
+  Chinesa: "🥡",
+  Mexicana: "🌮",
+  Francesa: "🥐",
+  "Árabe": "🥙",
+  Vegetariana: "🥗",
+  Vegan: "🌱",
+  "Pet-friendly": "🐾",
+  "Biológico": "🌾",
+  Brunch: "🥞",
+  "Rodízio": "🍽️",
+};
 
 function Home() {
-  const [tab, setTab] = useState<Tab>("restaurante");
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [filters, setFilters] = useState<FilterState>(defaultFilters);
-  const [sort, setSort] = useState<Sort>("best");
+  const [showAuto, setShowAuto] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [listening, setListening] = useState(false);
-  const [visible, setVisible] = useState(9);
-  const [showAuto, setShowAuto] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const geo = useUserLocation();
-  const userLoc = geo.location;
-  const fetchNearby = useSearchNearbyRestaurants();
-  const fetchText = useSearchRestaurantsByText();
-  const fetchGeo = useReverseGeocode();
 
-  // Reverse geocode: descobre país/cidade para adaptar região
-  const geoQuery = useQuery({
-    queryKey: ["geo", userLoc?.lat, userLoc?.lng],
-    queryFn: () => fetchGeo({ data: { latitude: userLoc!.lat, longitude: userLoc!.lng } }),
-    enabled: !!userLoc,
-    staleTime: 60 * 60 * 1000,
-  });
-  const regionCode = geoQuery.data?.countryCode;
-
-  // Combina texto digitado (nome do restaurante OU nome de prato) +
-  // palavras-chave das categorias especiais selecionadas. É isso que
-  // é enviado ao Google Places para achar pratos como "feijoada",
-  // "sushi de salmão", ou filtrar por Vegan/Pet-friendly/Brunch etc.
-  const specialSelected = useMemo(
-    () =>
-      filters.cuisines.filter((c) =>
-        (SPECIAL_CATEGORIES as readonly string[]).includes(c),
-      ),
-    [filters.cuisines],
-  );
-  const classicSelected = useMemo(
-    () =>
-      filters.cuisines.filter(
-        (c) => !(SPECIAL_CATEGORIES as readonly string[]).includes(c),
-      ),
-    [filters.cuisines],
-  );
-  const effectiveQuery = useMemo(() => {
-    const parts = [
-      debounced,
-      ...specialSelected.map((s) => CATEGORY_QUERY_TERMS[s] ?? s),
-    ].filter(Boolean);
-    return parts.join(" ").trim();
-  }, [debounced, specialSelected]);
-
-  // Lista de restaurantes: por texto (quando há busca) ou por proximidade
-  const nearbyQuery = useQuery({
-    queryKey: ["nearby", userLoc?.lat, userLoc?.lng, regionCode],
-    queryFn: () =>
-      fetchNearby({
-        data: {
-          latitude: userLoc!.lat,
-          longitude: userLoc!.lng,
-          radius: 5000,
-          regionCode,
-        },
-      }),
-    enabled: !!userLoc && !effectiveQuery,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    retry: 1,
-  });
-  const textQuery = useQuery({
-    queryKey: ["places-text", effectiveQuery, userLoc?.lat, userLoc?.lng, regionCode],
-    queryFn: () =>
-      fetchText({
-        data: {
-          query: effectiveQuery,
-          latitude: userLoc?.lat,
-          longitude: userLoc?.lng,
-          regionCode,
-        },
-      }),
-    enabled: !!effectiveQuery,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    retry: 1,
-  });
-
-  const remoteList: NearbyRestaurant[] | undefined = effectiveQuery
-    ? textQuery.data
-    : nearbyQuery.data;
-  const loadingRemote = effectiveQuery ? textQuery.isLoading : nearbyQuery.isLoading;
-  const remoteError = effectiveQuery ? textQuery.error : nearbyQuery.error;
-  const retryRemote = () => void (effectiveQuery ? textQuery.refetch() : nearbyQuery.refetch());
-  const usingRemote = !!userLoc && !!remoteList;
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 300);
-    return () => clearTimeout(t);
-  }, [query]);
+  const { geo, city, items, isLoading, usingRemote } = useDiscover();
 
   useEffect(() => setHistory(getSearchHistory()), []);
 
-  const suggestions = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    const src = usingRemote && remoteList ? remoteList : restaurants;
-    return src.filter((r) => r.name.toLowerCase().includes(q)).slice(0, 5);
-  }, [query, usingRemote, remoteList]);
+  const nearest = useMemo(() => sortDiscover(items, "near").slice(0, 10), [items]);
+  const top = useMemo(() => sortDiscover(items, "best").slice(0, 10), [items]);
 
-  const filtered = useMemo(() => {
-    // Base: dados reais do Google Places (se houver geolocalização), senão fallback mock.
-    const base = usingRemote && remoteList
-      ? remoteList.map((r) => ({
-          id: r.id,
-          name: r.name,
-          cuisine: r.cuisine,
-          rating: r.rating,
-          reviews: r.reviews,
-          priceLevel: r.priceLevel,
-          photo: r.photo,
-          latitude: r.latitude,
-          longitude: r.longitude,
-            allYouCanEat: r.allYouCanEat,
-          isNew: false,
-          promo: false,
-        }))
-      : restaurants;
-    const withDist = base.map((r) => ({
-      ...r,
-      distance: userLoc
-        ? +haversineKm(userLoc, { lat: r.latitude, lng: r.longitude }).toFixed(1)
-        : (r as { distance?: number }).distance ?? 0,
-    }));
-    let list = withDist.filter((r) => {
-      // Quando usamos dados do Google, ele já casou por texto (nome, prato,
-      // categoria). Só aplicamos o filtro local de texto no fallback mock.
-      if (!usingRemote && debounced) {
-        const q = debounced.toLowerCase();
-        if (
-          !r.name.toLowerCase().includes(q) &&
-          !r.cuisine.toLowerCase().includes(q)
-        )
-          return false;
-      }
-      // Rodízio é exclusivo para all-you-can-eat / buffet livre. O Google
-      // devolve churrascarias à la carte junto — filtramos por indícios no
-      // nome ou tipo do lugar.
-      if (specialSelected.includes("Rodízio")) {
-        const hay = `${r.name} ${r.cuisine}`.toLowerCase();
-        const isAyce =
-          (r as { allYouCanEat?: boolean }).allYouCanEat ||
-          /\b(rod[íi]zios?|all[-\s]?you[-\s]?can[-\s]?eat|coma(?:r)?\s+(?:à|a)\s+vontade|(?:a|à)\s+vontade|buffet\s+(?:livre|(?:à|a)\s+vontade)|espeto\s+corrido|sequ[êe]ncia\s+(?:livre|(?:à|a)\s+vontade))\b/.test(
-            hay,
-          );
-        if (!isAyce) return false;
-      }
-      // Categorias clássicas (Italiana, Japonesa, …) filtram por rótulo.
-      // Categorias especiais (Vegan, Brunch, …) já entraram como palavra-chave
-      // no textSearch — não filtramos localmente porque o Google raramente
-      // devolve esse rótulo em `cuisine`.
-      if (classicSelected.length && !classicSelected.includes(r.cuisine)) return false;
-      if (r.distance > filters.maxDistance) return false;
-      if (r.rating < filters.minRating) return false;
-      if (filters.priceLevels.length && !filters.priceLevels.includes(r.priceLevel)) return false;
-      return true;
-    });
-    // Proximidade é sempre um fator forte, independente do filtro/aba escolhida.
-    // Cada modo mantém seu critério principal, mas a distância penaliza opções distantes.
-    const proximityPenalty = (d: number, weight: number) => d * weight;
-    switch (sort) {
-      case "stars":
-        list = [...list].sort(
-          (a, b) => (b.rating - proximityPenalty(b.distance, 0.15)) - (a.rating - proximityPenalty(a.distance, 0.15)),
-        );
-        break;
-      case "best":
-        list = [...list].sort(
-          (a, b) =>
-            (b.rating * Math.log(b.reviews + 1) - proximityPenalty(b.distance, 0.4)) -
-            (a.rating * Math.log(a.reviews + 1) - proximityPenalty(a.distance, 0.4)),
-        );
-        break;
-      case "reviews":
-        list = [...list].sort(
-          (a, b) => (Math.log(b.reviews + 1) - proximityPenalty(b.distance, 0.2)) - (Math.log(a.reviews + 1) - proximityPenalty(a.distance, 0.2)),
-        );
-        break;
-      case "near":
-        list = [...list].sort((a, b) => a.distance - b.distance);
-        break;
-    }
-    return list;
-  }, [debounced, filters, classicSelected, specialSelected, sort, userLoc, usingRemote, remoteList]);
+  const suggestions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return items.filter((r) => r.name.toLowerCase().includes(q)).slice(0, 5);
+  }, [query, items]);
+
+  function submitSearch(q?: string) {
+    const v = (q ?? query).trim();
+    if (!v) return;
+    pushSearch(v);
+    setHistory(getSearchHistory());
+    setShowAuto(false);
+    inputRef.current?.blur();
+    navigate({ to: "/sugestoes", search: { modo: "best", q: v } });
+  }
 
   function startVoice() {
-    const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SR: any =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
       alert("Reconhecimento de voz não é suportado neste navegador.");
       return;
@@ -233,7 +108,9 @@ function Home() {
     rec.interimResults = true;
     setListening(true);
     rec.onresult = (e: any) => {
-      const t = Array.from(e.results).map((r: any) => r[0].transcript).join("");
+      const t = Array.from(e.results)
+        .map((r: any) => r[0].transcript)
+        .join("");
       setQuery(t);
     };
     rec.onend = () => setListening(false);
@@ -241,251 +118,206 @@ function Home() {
     rec.start();
   }
 
-  function submitSearch(q?: string) {
-    const v = (q ?? query).trim();
-    if (!v) return;
-    pushSearch(v);
-    setHistory(getSearchHistory());
-    setQuery(v);
-    setShowAuto(false);
-    inputRef.current?.blur();
-  }
-
   return (
-    <div>
-      {/* Hero */}
-      <section className="relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
-        <div className="mx-auto max-w-7xl px-4 py-8 md:py-12 text-primary-foreground">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] backdrop-blur">
-              <TrendingUp className="h-3 w-3" /> Restaurantes perto de você
-            </div>
-            <h1 className="mt-3 text-2xl md:text-3xl font-bold tracking-tight">
-              Onde comer hoje?
-            </h1>
-          </div>
+    <div className="mx-auto max-w-5xl px-4 pb-6 pt-5">
+      {/* Saudação */}
+      <h1 className="text-2xl font-bold leading-tight tracking-tight">
+        Bora comer
+        <br />
+        <span className="text-primary">algo incrível hoje?</span>
+      </h1>
 
-          {/* Tabs */}
-          <div className="mt-4 inline-flex rounded-full bg-white/10 p-1 backdrop-blur">
-            {(["restaurante", "localidade"] as Tab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`rounded-full px-4 py-1.5 text-xs font-medium capitalize transition-colors ${
-                  tab === t ? "bg-background text-foreground" : "text-primary-foreground/80 hover:text-primary-foreground"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-
-          {/* Search */}
-          <div className="relative mt-3 max-w-2xl">
-            {tab === "restaurante" ? (
-              <div className="relative">
-                <div className="flex items-center gap-2 rounded-2xl bg-background p-1.5 shadow-lg">
-                  <div className="pl-2 text-muted-foreground">
-                    <Search className="h-4 w-4" />
-                  </div>
-                  <Input
-                    ref={inputRef}
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    onFocus={() => setShowAuto(true)}
-                    onBlur={() => setTimeout(() => setShowAuto(false), 150)}
-                    onKeyDown={(e) => e.key === "Enter" && submitSearch()}
-                    placeholder="Buscar o que você quiser"
-                    className="h-9 flex-1 border-0 bg-transparent focus-visible:ring-0 shadow-none text-sm"
-                  />
-                  <button
-                    onClick={startVoice}
-                    aria-label="Busca por voz"
-                    className={`grid h-9 w-9 place-items-center rounded-xl transition-colors ${
-                      listening ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-muted text-foreground hover:bg-muted/80"
-                    }`}
-                  >
-                    <Mic className="h-4 w-4" />
-                  </button>
-                  <Button onClick={() => submitSearch()} className="h-9 rounded-xl text-sm">
-                    Buscar
-                  </Button>
-                </div>
-                {showAuto && (suggestions.length > 0 || history.length > 0) && (
-                  <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl">
-                    {suggestions.length > 0 && (
-                      <div className="p-2">
-                        <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sugestões</div>
-                        {suggestions.map((r) => (
-                          <button
-                            key={r.id}
-                            onMouseDown={() => submitSearch(r.name)}
-                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-muted"
-                          >
-                            <Utensils className="h-4 w-4 text-muted-foreground" />
-                            <span className="flex-1">{r.name}</span>
-                            <span className="text-xs text-muted-foreground">{r.cuisine}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {history.length > 0 && (
-                      <div className="border-t border-border p-2">
-                        <div className="flex items-center justify-between px-3 py-1">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Buscas recentes</div>
-                          <button
-                            onMouseDown={() => {
-                              clearSearchHistory();
-                              setHistory([]);
-                            }}
-                            className="text-xs text-muted-foreground hover:text-foreground"
-                          >
-                            limpar
-                          </button>
-                        </div>
-                        {history.map((h) => (
-                          <button
-                            key={h}
-                            onMouseDown={() => submitSearch(h)}
-                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-muted"
-                          >
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className="flex-1">{h}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <MapPreview />
-            )}
-          </div>
+      {/* Busca */}
+      <div className="relative mt-4">
+        <div
+          className="flex items-center gap-2 rounded-2xl border border-border bg-card p-1.5"
+          style={{ boxShadow: "var(--shadow-card)" }}
+        >
+          <Search className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <Input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setShowAuto(true)}
+            onBlur={() => setTimeout(() => setShowAuto(false), 150)}
+            onKeyDown={(e) => e.key === "Enter" && submitSearch()}
+            placeholder="Buscar culinária, prato ou lugar"
+            className="h-9 flex-1 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0"
+          />
+          <button
+            onClick={startVoice}
+            aria-label="Busca por voz"
+            className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-colors ${
+              listening
+                ? "animate-pulse bg-destructive text-destructive-foreground"
+                : "bg-muted text-foreground hover:bg-muted/80"
+            }`}
+          >
+            <Mic className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => submitSearch()}
+            aria-label="Buscar"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"
+          >
+            <Search className="h-4 w-4" />
+          </button>
         </div>
-      </section>
 
-      {/* Body */}
-      <section className="mx-auto max-w-7xl px-4 py-8">
-        <LocationBar geo={geo} cityFromGps={geoQuery.data?.city} />
-        <div className="mt-6 grid gap-6 lg:grid-cols-[300px_1fr]">
-          <aside className="space-y-4">
-            <Filters value={filters} onChange={setFilters} />
-          </aside>
-          <div>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-bold">
-                  {filtered.length} {filtered.length === 1 ? "restaurante" : "restaurantes"}
-                  {usingRemote && geoQuery.data?.city && (
-                    <span className="ml-2 text-sm font-normal text-muted-foreground">
-                      · próximos a {geoQuery.data.city}
-                    </span>
-                  )}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {!userLoc
-                    ? "Ative a localização para ver restaurantes reais perto de você."
-                    : loadingRemote
-                      ? "Buscando restaurantes próximos no Google Maps…"
-                      : usingRemote
-                        ? "Resultados reais do Google Maps, ordenados por proximidade."
-                        : "Mostrando prévia local — sem cobertura de dados na sua região."}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {([
-                  ["stars", "★ Mais estrelas"],
-                  ["best", "Melhor avaliado"],
-                  ["reviews", "Mais avaliações"],
-                  ["near", "Mais próximo"],
-                ] as [Sort, string][]).map(([k, l]) => (
+        {showAuto && (suggestions.length > 0 || history.length > 0) && (
+          <div className="absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl">
+            {suggestions.length > 0 && (
+              <div className="p-2">
+                <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Sugestões
+                </div>
+                {suggestions.map((r) => (
                   <button
-                    key={k}
-                    onClick={() => setSort(k)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                      sort === k ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:bg-muted"
-                    }`}
+                    key={r.id}
+                    onMouseDown={() => submitSearch(r.name)}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
                   >
-                    {l}
+                    <Utensils className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{r.cuisine}</span>
                   </button>
                 ))}
               </div>
-            </div>
-
-            {remoteError && (
-              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
-                <p className="flex-1 text-sm">
-                  Não foi possível buscar restaurantes agora. Verifique sua conexão e tente
-                  novamente — enquanto isso mostramos uma prévia local.
-                </p>
-                <Button size="sm" variant="outline" onClick={retryRemote}>
-                  Tentar novamente
-                </Button>
-              </div>
             )}
-
-            {filtered.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border p-12 text-center">
-                <Search className="mx-auto h-8 w-8 text-muted-foreground" />
-                <p className="mt-3 font-medium">Nenhum restaurante encontrado</p>
-                <p className="text-sm text-muted-foreground">Tente ajustar os filtros ou a busca.</p>
-              </div>
-            ) : (
-              <>
-                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                  {filtered.slice(0, visible).map((r) => (
-                    <RestaurantCard key={r.id} r={r} />
-                  ))}
+            {history.length > 0 && (
+              <div className="border-t border-border p-2">
+                <div className="flex items-center justify-between px-3 py-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Buscas recentes
+                  </span>
+                  <button
+                    onMouseDown={() => {
+                      clearSearchHistory();
+                      setHistory([]);
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    limpar
+                  </button>
                 </div>
-                {visible < filtered.length && (
-                  <div className="mt-8 flex justify-center">
-                    <Button variant="outline" onClick={() => setVisible((v) => v + 6)}>
-                      Carregar mais
-                    </Button>
-                  </div>
-                )}
-              </>
+                {history.map((h) => (
+                  <button
+                    key={h}
+                    onMouseDown={() => submitSearch(h)}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
+                  >
+                    <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate">{h}</span>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
+        )}
+      </div>
+
+      {/* Atalhos rápidos */}
+      <div className="mt-4 grid grid-cols-4 gap-2">
+        {QUICK.map(({ modo, label, icon: Icon }) => (
+          <Link
+            key={label}
+            to="/sugestoes"
+            search={{ modo }}
+            className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-2 py-3 text-center transition-colors hover:bg-muted"
+          >
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/12 text-primary">
+              <Icon className="h-4 w-4" />
+            </span>
+            <span className="text-[11px] font-medium leading-tight">{label}</span>
+          </Link>
+        ))}
+      </div>
+
+      <div className="mt-4">
+        <LocationBar geo={geo} cityFromGps={city} />
+      </div>
+
+      {/* Sugestões para você */}
+      <Section
+        title="Sugestões para você"
+        to={{ modo: "best" as SortMode }}
+        empty={isLoading ? "Buscando lugares perto de você…" : undefined}
+        items={top}
+      />
+
+      {/* Perto de você */}
+      <Section
+        title="Perto de você"
+        to={{ modo: "near" as SortMode }}
+        empty={isLoading ? "Buscando lugares perto de você…" : undefined}
+        items={nearest}
+      />
+
+      {/* Explore por culinária */}
+      <div className="mt-7">
+        <h2 className="text-base font-bold tracking-tight">Explore por culinária</h2>
+        <div className="-mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {cuisines.map((c) => (
+            <Link
+              key={c}
+              to="/sugestoes"
+              search={{ modo: "best" as SortMode, culinaria: c }}
+              className="flex w-[76px] shrink-0 flex-col items-center gap-1.5"
+            >
+              <span className="grid h-14 w-14 place-items-center rounded-2xl border border-border bg-card text-2xl">
+                {CUISINE_EMOJI[c] ?? "🍴"}
+              </span>
+              <span className="w-full truncate text-center text-[11px] text-muted-foreground">
+                {c}
+              </span>
+            </Link>
+          ))}
         </div>
-      </section>
+      </div>
+
+      {!usingRemote && !isLoading && (
+        <p className="mt-4 text-xs text-muted-foreground">
+          Mostrando prévia local — ative a localização para resultados reais perto de você.
+        </p>
+      )}
     </div>
   );
 }
 
-function MapPreview() {
+function Section({
+  title,
+  items,
+  to,
+  empty,
+}: {
+  title: string;
+  items: ReturnType<typeof sortDiscover>;
+  to: { modo: SortMode };
+  empty?: string | undefined;
+}) {
   return (
-    <div className="rounded-2xl bg-background p-4 shadow-lg">
-      <div className="relative aspect-[16/9] overflow-hidden rounded-xl bg-muted">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              "linear-gradient(oklch(0.92 0.02 210) 1px, transparent 1px), linear-gradient(90deg, oklch(0.92 0.02 210) 1px, transparent 1px)",
-            backgroundSize: "32px 32px",
-          }}
-        />
-        {restaurants.slice(0, 8).map((r, i) => {
-          const c = r.rating >= 4.5 ? "bg-success" : r.rating >= 3.5 ? "bg-warning" : r.rating >= 2.5 ? "bg-orange-500" : "bg-destructive";
-          return (
-            <div
-              key={r.id}
-              className={`absolute grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-white shadow-md ${c}`}
-              style={{ left: `${15 + (i * 11) % 70}%`, top: `${20 + (i * 17) % 60}%` }}
-              title={r.name}
-            >
-              <Star className="h-4 w-4 fill-current" />
-            </div>
-          );
-        })}
-        <div className="absolute bottom-3 left-3 right-3 rounded-xl bg-background/95 p-3 text-sm text-foreground shadow-lg backdrop-blur">
-          <div className="font-medium">Mapa interativo em preview</div>
-          <div className="text-xs text-muted-foreground">
-            Para ativar mapa completo com rotas e clustering, conecte uma chave do Google Maps.
-          </div>
-        </div>
+    <div className="mt-7">
+      <div className="flex items-end justify-between gap-3">
+        <h2 className="text-base font-bold tracking-tight">{title}</h2>
+        <Link
+          to="/sugestoes"
+          search={to}
+          className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-primary"
+        >
+          Ver todas <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
+      {items.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          {empty ?? "Nada por aqui ainda."}
+        </p>
+      ) : (
+        <div className="-mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {items.map((r) => (
+            <SuggestionCard key={r.id} r={r} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

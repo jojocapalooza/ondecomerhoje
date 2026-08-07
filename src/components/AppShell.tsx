@@ -1,10 +1,11 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { Home, Heart, TrendingUp, User, UtensilsCrossed } from "lucide-react";
+import { Home, Heart, Search, TrendingUp, User, UtensilsCrossed } from "lucide-react";
 
 const tabs = [
-  { to: "/", label: "Home", icon: Home },
+  { to: "/", label: "Início", icon: Home },
+  { to: "/sugestoes", label: "Explorar", icon: Search },
+  { to: "/trend", label: "Trend", icon: TrendingUp },
   { to: "/favoritos", label: "Favoritos", icon: Heart },
-  { to: "/trend", label: "Best Trend", icon: TrendingUp },
   { to: "/perfil", label: "Perfil", icon: User },
 ] as const;
 
@@ -13,17 +14,19 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/85 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:h-16">
           <Link to="/" className="flex items-center gap-2">
             <div className="grid h-9 w-9 place-items-center rounded-xl text-primary-foreground" style={{ background: "var(--gradient-hero)" }}>
               <UtensilsCrossed className="h-5 w-5" />
             </div>
             <div className="leading-tight">
               <div className="font-bold tracking-tight">Onde Comer Hoje</div>
-              <div className="text-xs text-muted-foreground -mt-0.5">Descubra sabores perto de você</div>
+              <div className="-mt-0.5 hidden text-xs text-muted-foreground sm:block">
+                Descubra sabores perto de você
+              </div>
             </div>
           </Link>
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden items-center gap-1 md:flex">
             {tabs.map((t) => {
               const active = pathname === t.to;
               return (
@@ -49,8 +52,8 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-background/95 backdrop-blur">
-        <div className="grid grid-cols-4">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur md:hidden">
+        <div className="grid grid-cols-5">
           {tabs.map((t) => {
             const active = pathname === t.to;
             return (

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrendRouteImport } from './routes/trend'
+import { Route as SugestoesRouteImport } from './routes/sugestoes'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as FavoritosRouteImport } from './routes/favoritos'
@@ -20,6 +21,11 @@ import { Route as ApiPublicRpcRouteImport } from './routes/api/public/rpc'
 const TrendRoute = TrendRouteImport.update({
   id: '/trend',
   path: '/trend',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SugestoesRoute = SugestoesRouteImport.update({
+  id: '/sugestoes',
+  path: '/sugestoes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/favoritos': typeof FavoritosRoute
   '/perfil': typeof PerfilRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/sugestoes': typeof SugestoesRoute
   '/trend': typeof TrendRoute
   '/restaurante/$id': typeof RestauranteIdRoute
   '/api/public/rpc': typeof ApiPublicRpcRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/favoritos': typeof FavoritosRoute
   '/perfil': typeof PerfilRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/sugestoes': typeof SugestoesRoute
   '/trend': typeof TrendRoute
   '/restaurante/$id': typeof RestauranteIdRoute
   '/api/public/rpc': typeof ApiPublicRpcRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/favoritos': typeof FavoritosRoute
   '/perfil': typeof PerfilRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/sugestoes': typeof SugestoesRoute
   '/trend': typeof TrendRoute
   '/restaurante/$id': typeof RestauranteIdRoute
   '/api/public/rpc': typeof ApiPublicRpcRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/favoritos'
     | '/perfil'
     | '/sitemap.xml'
+    | '/sugestoes'
     | '/trend'
     | '/restaurante/$id'
     | '/api/public/rpc'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/favoritos'
     | '/perfil'
     | '/sitemap.xml'
+    | '/sugestoes'
     | '/trend'
     | '/restaurante/$id'
     | '/api/public/rpc'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/favoritos'
     | '/perfil'
     | '/sitemap.xml'
+    | '/sugestoes'
     | '/trend'
     | '/restaurante/$id'
     | '/api/public/rpc'
@@ -116,6 +128,7 @@ export interface RootRouteChildren {
   FavoritosRoute: typeof FavoritosRoute
   PerfilRoute: typeof PerfilRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  SugestoesRoute: typeof SugestoesRoute
   TrendRoute: typeof TrendRoute
   RestauranteIdRoute: typeof RestauranteIdRoute
   ApiPublicRpcRoute: typeof ApiPublicRpcRoute
@@ -128,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/trend'
       fullPath: '/trend'
       preLoaderRoute: typeof TrendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sugestoes': {
+      id: '/sugestoes'
+      path: '/sugestoes'
+      fullPath: '/sugestoes'
+      preLoaderRoute: typeof SugestoesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -180,6 +200,7 @@ const rootRouteChildren: RootRouteChildren = {
   FavoritosRoute: FavoritosRoute,
   PerfilRoute: PerfilRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  SugestoesRoute: SugestoesRoute,
   TrendRoute: TrendRoute,
   RestauranteIdRoute: RestauranteIdRoute,
   ApiPublicRpcRoute: ApiPublicRpcRoute,
@@ -187,13 +208,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
