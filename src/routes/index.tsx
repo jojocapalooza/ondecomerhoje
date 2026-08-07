@@ -316,7 +316,7 @@ function Section({
           {empty ?? "Nada por aqui ainda."}
         </p>
       ) : (
-        <div className="-mx-4 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="-mr-4 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto pr-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {items.slice(0, 5).map((r) => (
             <div key={r.id} className="snap-start">
               <SuggestionCard r={r} />
