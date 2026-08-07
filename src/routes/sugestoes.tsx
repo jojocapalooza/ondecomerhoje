@@ -95,7 +95,7 @@ function Sugestoes() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-4">
+    <div className="mx-auto max-w-7xl px-4 pb-8 pt-5">
       <div className="flex items-center gap-3">
         <Link
           to="/"
@@ -121,26 +121,26 @@ function Sugestoes() {
         </button>
       </div>
 
-      <div className="mt-3 flex items-center gap-2 rounded-2xl border border-border bg-card p-1.5">
+      <div className="mt-4 flex items-center gap-2 rounded-2xl border border-border bg-card p-1.5">
         <Search className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
         <Input
           value={term}
           onChange={(e) => setTerm(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
-          placeholder="Buscar o que você quiser"
+          placeholder="O que você quiser"
           className="h-9 flex-1 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0"
         />
-        <Button onClick={submit} className="h-9 rounded-xl text-sm">
+        <Button onClick={submit} className="h-9 shrink-0 rounded-xl text-sm">
           Buscar
         </Button>
       </div>
 
-      <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {MODES.map(([m, label]) => (
           <button
             key={m}
             onClick={() => navigate({ search: (s: SearchParams) => ({ ...s, modo: m }) })}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`truncate rounded-full border px-3 py-2 text-xs font-medium transition-colors ${
               modo === m
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-card hover:bg-muted"
@@ -151,7 +151,7 @@ function Sugestoes() {
         ))}
       </div>
 
-      <div className="mt-3">
+      <div className="mt-4">
         <LocationBar geo={geo} cityFromGps={city} />
       </div>
 
