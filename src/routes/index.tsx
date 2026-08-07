@@ -41,10 +41,10 @@ export const Route = createFileRoute("/")({
 });
 
 const QUICK: { modo: SortMode; label: string; icon: typeof MapPin }[] = [
-  { modo: "near", label: "Perto de mim", icon: MapPin },
-  { modo: "new", label: "Novos lugares", icon: Sparkles },
-  { modo: "reviews", label: "Por culinária", icon: Utensils },
-  { modo: "best", label: "Mais avaliados", icon: Star },
+  { modo: "stars", label: "Mais Estrelas", icon: Star },
+  { modo: "best", label: "Melhor Avaliado", icon: Sparkles },
+  { modo: "reviews", label: "Mais Avaliações", icon: Utensils },
+  { modo: "near", label: "Mais Próximos", icon: MapPin },
 ];
 
 const CUISINE_EMOJI: Record<string, string> = {
@@ -77,8 +77,19 @@ function Home() {
 
   useEffect(() => setHistory(getSearchHistory()), []);
 
-  const nearest = useMemo(() => sortDiscover(items, "near").slice(0, 10), [items]);
-  const top = useMemo(() => sortDiscover(items, "best").slice(0, 10), [items]);
+  // "Sugestões para você": sempre os melhores da cidade (nota mais próxima de 5
+  // com maior volume de avaliações), com leve viés pelo histórico de busca.
+  const top = useMemo(() => {
+    const terms = history.map((h) => h.toLowerCase()).filter(Boolean);
+    const scored = sortDiscover(items, "stars");
+    if (!terms.length) return scored.slice(0, 5);
+    const matches = (r: (typeof scored)[number]) =>
+      terms.some((t) => `${r.name} ${r.cuisine}`.toLowerCase().includes(t));
+    return [...scored.filter(matches), ...scored.filter((r) => !matches(r))].slice(0, 5);
+  }, [items, history]);
+
+  // "Perto de você": bem avaliados priorizando a distância.
+  const nearest = useMemo(() => sortDiscover(items, "near").slice(0, 5), [items]);
 
   const suggestions = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -122,9 +133,7 @@ function Home() {
     <div className="mx-auto max-w-5xl px-4 pb-6 pt-5">
       {/* Saudação */}
       <h1 className="text-2xl font-bold leading-tight tracking-tight">
-        Bora comer
-        <br />
-        <span className="text-primary">algo incrível hoje?</span>
+        <span className="text-primary">Onde comer hoje?</span>
       </h1>
 
       {/* Busca */}
@@ -217,18 +226,18 @@ function Home() {
       </div>
 
       {/* Atalhos rápidos */}
-      <div className="mt-4 grid grid-cols-4 gap-2">
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {QUICK.map(({ modo, label, icon: Icon }) => (
           <Link
             key={label}
             to="/sugestoes"
             search={{ modo }}
-            className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-2 py-3 text-center transition-colors hover:bg-muted"
+            className="flex min-w-0 items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 text-left transition-colors hover:bg-muted sm:flex-col sm:text-center"
           >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/12 text-primary">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
               <Icon className="h-4 w-4" />
             </span>
-            <span className="text-[11px] font-medium leading-tight">{label}</span>
+            <span className="min-w-0 truncate text-[11px] font-medium leading-tight">{label}</span>
           </Link>
         ))}
       </div>
@@ -240,7 +249,7 @@ function Home() {
       {/* Sugestões para você */}
       <Section
         title="Sugestões para você"
-        to={{ modo: "best" as SortMode }}
+        to={{ modo: "stars" as SortMode }}
         empty={isLoading ? "Buscando lugares perto de você…" : undefined}
         items={top}
       />
@@ -256,18 +265,16 @@ function Home() {
       {/* Explore por culinária */}
       <div className="mt-7">
         <h2 className="text-base font-bold tracking-tight">Explore por culinária</h2>
-        <div className="-mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
           {cuisines.map((c) => (
             <Link
               key={c}
               to="/sugestoes"
-              search={{ modo: "best" as SortMode, culinaria: c }}
-              className="flex w-[76px] shrink-0 flex-col items-center gap-1.5"
+              search={{ modo: "stars" as SortMode, culinaria: c }}
+              className="flex min-w-0 flex-col items-center gap-1.5 rounded-2xl border border-border bg-card px-1 py-2.5 transition-colors hover:bg-muted"
             >
-              <span className="grid h-14 w-14 place-items-center rounded-2xl border border-border bg-card text-2xl">
-                {CUISINE_EMOJI[c] ?? "🍴"}
-              </span>
-              <span className="w-full truncate text-center text-[11px] text-muted-foreground">
+              <span className="text-2xl leading-none">{CUISINE_EMOJI[c] ?? "🍴"}</span>
+              <span className="w-full truncate text-center text-[10px] leading-tight text-muted-foreground">
                 {c}
               </span>
             </Link>
@@ -312,10 +319,20 @@ function Section({
           {empty ?? "Nada por aqui ainda."}
         </p>
       ) : (
-        <div className="-mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {items.map((r) => (
-            <SuggestionCard key={r.id} r={r} />
+        <div className="-mx-4 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {items.slice(0, 5).map((r) => (
+            <div key={r.id} className="snap-start">
+              <SuggestionCard r={r} />
+            </div>
           ))}
+          <Link
+            to="/sugestoes"
+            search={to}
+            className="flex w-[120px] shrink-0 snap-start flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border text-xs font-medium text-primary"
+          >
+            Ver todas
+            <ChevronRight className="h-4 w-4" />
+          </Link>
         </div>
       )}
     </div>
