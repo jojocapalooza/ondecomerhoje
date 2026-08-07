@@ -130,14 +130,14 @@ function Home() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 pb-6 pt-5">
+    <div className="mx-auto max-w-5xl px-4 pb-8 pt-6">
       {/* Saudação */}
       <h1 className="text-2xl font-bold leading-tight tracking-tight">
         <span className="text-primary">Onde comer hoje?</span>
       </h1>
 
       {/* Busca */}
-      <div className="relative mt-4">
+      <div className="relative mt-5">
         <div
           className="flex items-center gap-2 rounded-2xl border border-border bg-card p-1.5"
           style={{ boxShadow: "var(--shadow-card)" }}
@@ -150,7 +150,7 @@ function Home() {
             onFocus={() => setShowAuto(true)}
             onBlur={() => setTimeout(() => setShowAuto(false), 150)}
             onKeyDown={(e) => e.key === "Enter" && submitSearch()}
-            placeholder="Buscar culinária, prato ou lugar"
+            placeholder="O que você quiser"
             className="h-9 flex-1 border-0 bg-transparent text-sm shadow-none focus-visible:ring-0"
           />
           <button
@@ -226,23 +226,23 @@ function Home() {
       </div>
 
       {/* Atalhos rápidos */}
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {QUICK.map(({ modo, label, icon: Icon }) => (
           <Link
             key={label}
             to="/sugestoes"
             search={{ modo }}
-            className="flex min-w-0 items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 text-left transition-colors hover:bg-muted sm:flex-col sm:text-center"
+            className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-border bg-card px-3 py-3.5 text-left transition-colors hover:bg-muted sm:flex-col sm:gap-2 sm:py-4 sm:text-center"
           >
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
               <Icon className="h-4 w-4" />
             </span>
-            <span className="min-w-0 truncate text-[11px] font-medium leading-tight">{label}</span>
+            <span className="min-w-0 truncate text-xs font-medium leading-tight">{label}</span>
           </Link>
         ))}
       </div>
 
-      <div className="mt-4">
+      <div className="mt-5">
         <LocationBar geo={geo} cityFromGps={city} />
       </div>
 
@@ -263,18 +263,18 @@ function Home() {
       />
 
       {/* Explore por culinária */}
-      <div className="mt-7">
+      <div className="mt-8">
         <h2 className="text-base font-bold tracking-tight">Explore por culinária</h2>
-        <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
+        <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-8">
           {cuisines.map((c) => (
             <Link
               key={c}
               to="/sugestoes"
               search={{ modo: "stars" as SortMode, culinaria: c }}
-              className="flex min-w-0 flex-col items-center gap-1.5 rounded-2xl border border-border bg-card px-1 py-2.5 transition-colors hover:bg-muted"
+              className="flex min-w-0 flex-col items-center gap-1.5 rounded-2xl border border-border bg-card px-2 py-3 transition-colors hover:bg-muted"
             >
               <span className="text-2xl leading-none">{CUISINE_EMOJI[c] ?? "🍴"}</span>
-              <span className="w-full truncate text-center text-[10px] leading-tight text-muted-foreground">
+              <span className="w-full truncate text-center text-[11px] leading-tight text-muted-foreground">
                 {c}
               </span>
             </Link>
@@ -303,7 +303,7 @@ function Section({
   empty?: string | undefined;
 }) {
   return (
-    <div className="mt-7">
+    <div className="mt-8">
       <div className="flex items-end justify-between gap-3">
         <h2 className="text-base font-bold tracking-tight">{title}</h2>
         <Link
