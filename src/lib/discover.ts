@@ -43,7 +43,8 @@ export function useDiscover({
   cuisines?: string[];
   geo?: UseUserLocation;
 } = {}) {
-  const geo = externalGeo ?? useUserLocation();
+  const ownGeo = useUserLocation();
+  const geo = externalGeo ?? ownGeo;
   const userLoc = geo.location;
   const fetchNearby = useSearchNearbyRestaurants();
   const fetchText = useSearchRestaurantsByText();
