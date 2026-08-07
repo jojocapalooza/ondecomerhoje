@@ -17,11 +17,11 @@ type SearchParams = {
 };
 
 const MODES: [SortMode, string][] = [
-  ["near", "📍 Perto de mim"],
-  ["new", "✨ Novos lugares"],
-  ["best", "🔥 Mais avaliados"],
-  ["stars", "⭐ Mais estrelas"],
-  ["reviews", "💬 Mais comentados"],
+  ["near", "Perto de mim"],
+  ["new", "Novos lugares"],
+  ["best", "Mais avaliados"],
+  ["stars", "Mais estrelas"],
+  ["reviews", "Mais comentados"],
 ];
 
 export const Route = createFileRoute("/sugestoes")({
