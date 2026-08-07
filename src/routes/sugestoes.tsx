@@ -92,7 +92,7 @@ function Sugestoes() {
   function submit() {
     const v = term.trim();
     if (v) pushSearch(v);
-    navigate({ search: (s) => ({ ...s, q: v || undefined }) });
+    navigate({ search: (s: SearchParams) => ({ ...s, q: v || undefined }) });
   }
 
   return (
@@ -140,7 +140,7 @@ function Sugestoes() {
         {MODES.map(([m, label]) => (
           <button
             key={m}
-            onClick={() => navigate({ search: (s) => ({ ...s, modo: m }) })}
+            onClick={() => navigate({ search: (s: SearchParams) => ({ ...s, modo: m }) })}
             className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
               modo === m
                 ? "border-primary bg-primary text-primary-foreground"
