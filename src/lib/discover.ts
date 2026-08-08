@@ -231,7 +231,8 @@ function fiveStarWeight(r: DiscoverItem) {
  */
 function starsScore(r: DiscoverItem) {
   const gapToFive = 5 - r.rating; // 0 = perfeito
-  return -gapToFive * 10 + fiveStarWeight(r) * 1.4 - Math.min(r.distance, 15) * 0.08;
+  // A distância quase não pesa: o recorte de raio já garante que é na cidade.
+  return -gapToFive * 10 + fiveStarWeight(r) * 1.4 - Math.min(r.distance, 15) * 0.015;
 }
 
 /**
