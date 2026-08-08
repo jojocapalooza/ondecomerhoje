@@ -178,13 +178,11 @@ export function sortDiscover(list: DiscoverItem[], mode: SortMode): DiscoverItem
   const arr = [...list];
   switch (mode) {
     case "stars":
-      // Prioridade absoluta à nota (o mais próximo de 5 estrelas), depois ao
-      // volume de avaliações 5 estrelas e por último à distância.
-      return arr.sort(
-        (a, b) =>
-          b.rating + Math.log(b.reviews + 1) * 0.06 - p(b.distance, 0.05) -
-          (a.rating + Math.log(a.reviews + 1) * 0.06 - p(a.distance, 0.05)),
-      );
+      // Estrelas primeiro (o mais próximo de 5), depois o volume estimado de
+      // avaliações 5 estrelas e, por fim, um leve desempate por distância.
+      return arr
+        .filter((r) => r.rating >= 4 && r.reviews >= 20)
+        .sort((a, b) => starsScore(b) - starsScore(a));
     case "best":
       return arr.sort(
         (a, b) =>
@@ -209,12 +207,34 @@ export function sortDiscover(list: DiscoverItem[], mode: SortMode): DiscoverItem
         );
     case "near":
     default:
-      // Distância em primeiro lugar, com um leve empurrão para os bem
-      // avaliados (nota média alta + muitas avaliações).
-      return arr.sort(
-        (a, b) =>
-          a.distance - (a.rating - 3) * 0.12 - Math.log(a.reviews + 1) * 0.04 -
-          (b.distance - (b.rating - 3) * 0.12 - Math.log(b.reviews + 1) * 0.04),
-      );
+      // Distância em primeiro lugar; entre os vizinhos, os mais bem avaliados
+      // (nota média alta + muitas avaliações) sobem.
+      return arr
+        .filter((r) => r.rating >= 3.8)
+        .sort((a, b) => nearScore(a) - nearScore(b));
   }
+}
+
+/** Fatia de avaliações 5 estrelas estimada a partir da nota média. */
+function fiveStarWeight(r: DiscoverItem) {
+  const share = Math.max(0, Math.min(1, (r.rating - 3.4) / 1.6));
+  return Math.log10(1 + r.reviews * share);
+}
+
+/**
+ * "Sugestões para você": prioridade absoluta à nota (quanto mais perto de 5,
+ * melhor), reforçada pelo volume de 5 estrelas; a distância só desempata.
+ */
+function starsScore(r: DiscoverItem) {
+  const gapToFive = 5 - r.rating; // 0 = perfeito
+  return -gapToFive * 10 + fiveStarWeight(r) * 1.4 - Math.min(r.distance, 15) * 0.08;
+}
+
+/**
+ * "Perto de você": distância manda (menor = melhor), com desconto para quem é
+ * muito bem avaliado (nota alta e muitas avaliações).
+ */
+function nearScore(r: DiscoverItem) {
+  const quality = (r.rating - 3.8) * 0.5 + fiveStarWeight(r) * 0.35;
+  return r.distance - Math.min(quality, 1.5);
 }
