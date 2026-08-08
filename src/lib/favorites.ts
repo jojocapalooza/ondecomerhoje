@@ -137,18 +137,37 @@ export function useUserLocation(): UseUserLocation {
       if (isNativeApp()) {
         try {
           const { Geolocation } = await import("@capacitor/geolocation");
-          const perm = await Geolocation.requestPermissions();
+          let perm = await Geolocation.checkPermissions();
+          if (perm.location !== "granted" && perm.coarseLocation !== "granted") {
+            perm = await Geolocation.requestPermissions();
+          }
           if (perm.location === "denied" && perm.coarseLocation === "denied") {
             setStatus("denied");
             setError("Permissão de localização negada. Informe sua cidade ou endereço.");
             return;
           }
-          const p = await Geolocation.getCurrentPosition({
-            enableHighAccuracy: false,
-            timeout: 10000,
-            maximumAge: 5 * 60 * 1000,
-          });
-          apply(p.coords.latitude, p.coords.longitude, "gps");
+          // Em cidades grandes (prédios altos, GPS frio) a primeira leitura
+          // costuma estourar o tempo: tentamos rápido e depois com precisão
+          // alta e mais tempo antes de desistir.
+          const attempts = [
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 5 * 60 * 1000 },
+            { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 },
+          ];
+          for (const opts of attempts) {
+            try {
+              const p = await Geolocation.getCurrentPosition(opts);
+              apply(p.coords.latitude, p.coords.longitude, "gps");
+              return;
+            } catch {
+              // tenta a próxima estratégia
+            }
+          }
+          if (!cancelled.current) {
+            setStatus("error");
+            setError(
+              "O GPS do aparelho não respondeu. Informe sua cidade ou endereço para continuar.",
+            );
+          }
           return;
         } catch {
           // cai no navigator abaixo
@@ -168,10 +187,12 @@ export function useUserLocation(): UseUserLocation {
           setError(
             denied
               ? "Permissão de localização negada. Informe sua cidade ou endereço."
-              : "Não conseguimos obter sua localização. Informe sua cidade ou endereço.",
+              : err.code === err.TIMEOUT
+                ? "O GPS demorou para responder. Informe sua cidade ou endereço."
+                : "Não conseguimos obter sua localização. Informe sua cidade ou endereço.",
           );
         },
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 5 * 60 * 1000 },
       );
     } catch {
       if (!cancelled.current) {
