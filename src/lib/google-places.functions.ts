@@ -307,30 +307,40 @@ export const searchNearbyRestaurants = createServerFn({ method: "POST" })
     }) => input,
   )
   .handler(async ({ data }): Promise<NearbyRestaurant[]> => {
-    const body = {
-      includedTypes: ["restaurant"],
-      maxResultCount: 20,
-      rankPreference: "DISTANCE",
-      languageCode: data.languageCode ?? "pt-BR",
-      regionCode: data.regionCode ?? "BR",
-      locationRestriction: {
-        circle: {
-          center: { latitude: data.latitude, longitude: data.longitude },
-          radius: Math.min(data.radius ?? 5000, 50000),
+    const radius = Math.min(data.radius ?? 5000, 50000);
+    // A API devolve no máximo 20 lugares por chamada. Só com DISTANCE tudo
+    // vinha a poucos metros do usuário, então também pedimos os mais
+    // populares do mesmo raio (os "melhores da cidade") e juntamos os dois.
+    const run = async (rankPreference: "DISTANCE" | "POPULARITY") => {
+      const body = {
+        includedTypes: ["restaurant"],
+        maxResultCount: 20,
+        rankPreference,
+        languageCode: data.languageCode ?? "pt-BR",
+        regionCode: data.regionCode ?? "BR",
+        locationRestriction: {
+          circle: { center: { latitude: data.latitude, longitude: data.longitude }, radius },
         },
-      },
+      };
+      const res = await gatewayFetch(`/places/v1/places:searchNearby`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Goog-FieldMask": LIST_FIELD_MASK },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        console.error(
+          `[places] searchNearby (${rankPreference}) failed [${res.status}]: ${await res.text()}`,
+        );
+        return [] as SearchPlace[];
+      }
+      const json = (await res.json()) as { places?: SearchPlace[] };
+      return json.places ?? [];
     };
-    const res = await gatewayFetch(`/places/v1/places:searchNearby`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Goog-FieldMask": LIST_FIELD_MASK },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      console.error(`[places] searchNearby failed [${res.status}]: ${await res.text()}`);
-      return [];
-    }
-    const json = (await res.json()) as { places?: SearchPlace[] };
-    return Promise.all((json.places ?? []).map(toNearby));
+
+    const [near, popular] = await Promise.all([run("DISTANCE"), run("POPULARITY")]);
+    const byId = new Map<string, SearchPlace>();
+    for (const p of [...near, ...popular]) if (p.id && !byId.has(p.id)) byId.set(p.id, p);
+    return Promise.all([...byId.values()].map(toNearby));
   });
 
 // Busca por texto (nome/culinária) próximo à localização
