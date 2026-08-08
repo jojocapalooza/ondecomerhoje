@@ -180,9 +180,9 @@ export function sortDiscover(list: DiscoverItem[], mode: SortMode): DiscoverItem
     case "stars":
       // Estrelas primeiro (o mais próximo de 5), depois o volume estimado de
       // avaliações 5 estrelas e, por fim, um leve desempate por distância.
-      return arr
-        .filter((r) => r.rating >= 4 && r.reviews >= 20)
-        .sort((a, b) => starsScore(b) - starsScore(a));
+      return withFallback(arr, (r) => r.rating >= 4 && r.reviews >= 20).sort(
+        (a, b) => starsScore(b) - starsScore(a),
+      );
     case "best":
       return arr.sort(
         (a, b) =>
@@ -209,10 +209,14 @@ export function sortDiscover(list: DiscoverItem[], mode: SortMode): DiscoverItem
     default:
       // Distância em primeiro lugar; entre os vizinhos, os mais bem avaliados
       // (nota média alta + muitas avaliações) sobem.
-      return arr
-        .filter((r) => r.rating >= 3.8)
-        .sort((a, b) => nearScore(a) - nearScore(b));
+      return withFallback(arr, (r) => r.rating >= 3.8).sort((a, b) => nearScore(a) - nearScore(b));
   }
+}
+
+/** Aplica o filtro de qualidade, mas nunca devolve lista vazia. */
+function withFallback(arr: DiscoverItem[], ok: (r: DiscoverItem) => boolean) {
+  const kept = arr.filter(ok);
+  return kept.length >= 3 ? kept : arr;
 }
 
 /** Fatia de avaliações 5 estrelas estimada a partir da nota média. */
