@@ -134,8 +134,8 @@ function Home() {
   return (
     <div className="mx-auto max-w-5xl px-4 pb-8 pt-6">
       {/* Saudação */}
-      <h1 className="text-2xl font-bold leading-tight tracking-tight">
-        <span className="text-primary">Onde comer hoje?</span>
+      <h1 className="text-xl font-semibold leading-tight tracking-tight text-foreground">
+        Bora comer?
       </h1>
 
       {/* Busca */}
