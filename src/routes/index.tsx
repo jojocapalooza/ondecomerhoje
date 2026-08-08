@@ -77,11 +77,13 @@ function Home() {
 
   useEffect(() => setHistory(getSearchHistory()), []);
 
-  // "Sugestões para você": sempre os melhores da cidade (nota mais próxima de 5
-  // com maior volume de avaliações), com leve viés pelo histórico de busca.
+  // "Sugestões para você": os melhores da cidade (nota mais próxima de 5 com
+  // maior volume de 5 estrelas) dentro de um raio de até 5 km, com viés pelo
+  // histórico de busca quando ele existe.
   const top = useMemo(() => {
-    const terms = history.map((h) => h.toLowerCase()).filter(Boolean);
-    const scored = sortDiscover(items, "stars");
+    const inCity = items.filter((r) => r.distance <= 5);
+    const scored = sortDiscover(inCity.length >= 3 ? inCity : items, "stars");
+    const terms = history.map((h) => h.toLowerCase().trim()).filter(Boolean);
     if (!terms.length) return scored.slice(0, 5);
     const matches = (r: (typeof scored)[number]) =>
       terms.some((t) => `${r.name} ${r.cuisine}`.toLowerCase().includes(t));
