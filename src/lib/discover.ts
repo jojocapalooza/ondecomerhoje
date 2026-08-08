@@ -180,7 +180,7 @@ export function sortDiscover(list: DiscoverItem[], mode: SortMode): DiscoverItem
     case "stars":
       // Estrelas primeiro (o mais próximo de 5), depois o volume estimado de
       // avaliações 5 estrelas e, por fim, um leve desempate por distância.
-      return withFallback(arr, (r) => r.rating >= 4 && r.reviews >= 20).sort(
+      return withFallback(arr, (r) => r.rating >= 4.4 && r.reviews >= 50).sort(
         (a, b) => starsScore(b) - starsScore(a),
       );
     case "best":
