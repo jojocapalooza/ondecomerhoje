@@ -9,29 +9,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useFavorites } from "@/lib/favorites";
 import { formatReviews, priceLabel, ratingColor, restaurants, type Restaurant } from "@/lib/restaurants";
 import {
-  getRestaurantPlace,
-  getPlaceDetailsById,
   cuisinePhoto,
   type PlaceData,
 } from "@/lib/google-places.functions";
 
-const placeQueryOptions = (id: string, r?: Restaurant) =>
-  queryOptions({
-    queryKey: ["place", id],
-    queryFn: () =>
-      r
-        ? getRestaurantPlace({
-            data: { query: `${r.name} ${r.city}`, latitude: r.latitude, longitude: r.longitude },
-          })
-        : getPlaceDetailsById({ data: { placeId: id } }),
-    staleTime: 60 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
-  });
+// A busca dos detalhes acontece sempre no cliente, pelo canal ciente do
+// ambiente (server function no navegador, /api/public/rpc no app Android).
+const placeQueryKey = (id: string) => ["place", id] as const;
 
 export const Route = createFileRoute("/restaurante/$id")({
   loader: async ({ params, context }) => {
     const r = restaurants.find((x) => x.id === params.id);
-    void context.queryClient.prefetchQuery(placeQueryOptions(params.id, r));
     return { id: params.id, r: r ?? null };
   },
   head: ({ loaderData }) => {
@@ -70,14 +58,17 @@ function Detail() {
   const fav = has(favId);
   const fetchPlace = useGetRestaurantPlace();
   const fetchDetails = useGetPlaceDetailsById();
-  const { data: place } = useSuspenseQuery({
-    ...placeQueryOptions(id, r ?? undefined),
+  const { data: place } = useQuery({
+    queryKey: placeQueryKey(id),
     queryFn: () =>
       r
         ? fetchPlace({
             data: { query: `${r.name} ${r.city}`, latitude: r.latitude, longitude: r.longitude },
           })
         : fetchDetails({ data: { placeId: id } }),
+    staleTime: 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    retry: 1,
   });
 
   const cuisine = r?.cuisine ?? "Restaurante";
