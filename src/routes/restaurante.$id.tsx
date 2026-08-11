@@ -1,7 +1,18 @@
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useGetRestaurantPlace, useGetPlaceDetailsById } from "@/lib/data-rpc";
-import { ArrowLeft, CheckCircle2, Clock, Globe, Heart, MapPin, Phone, Star } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  Globe,
+  Heart,
+  Loader2,
+  MapPin,
+  Navigation,
+  Phone,
+  Star,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,7 +29,7 @@ import {
 const placeQueryKey = (id: string) => ["place", id] as const;
 
 export const Route = createFileRoute("/restaurante/$id")({
-  loader: async ({ params, context }) => {
+  loader: async ({ params }) => {
     const r = restaurants.find((x) => x.id === params.id);
     return { id: params.id, r: r ?? null };
   },
@@ -58,7 +69,7 @@ function Detail() {
   const fav = has(favId);
   const fetchPlace = useGetRestaurantPlace();
   const fetchDetails = useGetPlaceDetailsById();
-  const { data: place } = useQuery({
+  const { data: place, isPending, isError } = useQuery<PlaceData | null>({
     queryKey: placeQueryKey(id),
     queryFn: () =>
       r
@@ -82,9 +93,30 @@ function Detail() {
   const priceLvl = ((place?.priceLevel ?? r?.priceLevel ?? 2) as 1 | 2 | 3 | 4);
   const displayName = place?.name ?? r?.name ?? "Restaurante";
   const location = place?.location ?? { latitude: r?.latitude ?? 0, longitude: r?.longitude ?? 0 };
-  const mapsUri =
+  const routeUri =
     place?.googleMapsUri ??
     `https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}`;
+  const mapsUri = place?.googleMapsUri
+    ? place.googleMapsUri
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        `${displayName} ${address}`.trim(),
+      )}`;
+
+  function favorite() {
+    toggle({
+      id: favId,
+      name: displayName,
+      cuisine,
+      rating,
+      reviews: reviewsCount,
+      priceLevel: priceLvl,
+      photo: heroPhoto,
+      latitude: location.latitude || undefined,
+      longitude: location.longitude || undefined,
+      address,
+      googleMapsUri: mapsUri,
+    });
+  }
 
   return (
     <article>
