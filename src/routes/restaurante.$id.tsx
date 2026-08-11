@@ -158,17 +158,32 @@ function Detail() {
                   <MapPin className="h-4 w-4" /> {address}
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="icon" onClick={() => toggle(favId)} aria-label="Favoritar">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="icon" onClick={favorite} aria-label={fav ? "Remover dos favoritos" : "Salvar nos favoritos"}>
                   <Heart className={fav ? "fill-destructive text-destructive" : ""} />
                 </Button>
-                <Button asChild>
+                <Button variant="outline" asChild>
                   <a href={mapsUri} target="_blank" rel="noreferrer">
-                    Traçar rota
+                    <MapPin className="h-4 w-4" /> Abrir no Google Maps
+                  </a>
+                </Button>
+                <Button asChild>
+                  <a href={routeUri} target="_blank" rel="noreferrer">
+                    <Navigation className="h-4 w-4" /> Traçar rota
                   </a>
                 </Button>
               </div>
             </div>
+            {isPending && (
+              <p className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando informações do Google Maps…
+              </p>
+            )}
+            {isError && (
+              <p className="mt-4 text-sm text-destructive">
+                Não foi possível carregar os detalhes agora. Você ainda pode abrir o local no Google Maps.
+              </p>
+            )}
           </div>
         </div>
       </div>
