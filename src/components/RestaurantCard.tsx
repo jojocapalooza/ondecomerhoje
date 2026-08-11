@@ -13,6 +13,8 @@ export type CardRestaurant = {
   priceLevel: 1 | 2 | 3 | 4;
   photo: string;
   distance: number;
+  latitude?: number;
+  longitude?: number;
   isNew?: boolean;
   promo?: boolean;
 };
@@ -34,7 +36,18 @@ export function RestaurantCard({ r }: { r: CardRestaurant }) {
       <button
         onClick={(e) => {
           e.preventDefault();
-          toggle(r.id);
+          toggle({
+            id: r.id,
+            name: r.name,
+            cuisine: r.cuisine,
+            rating: r.rating,
+            reviews: r.reviews,
+            priceLevel: r.priceLevel,
+            photo: r.photo,
+            distance: r.distance,
+            latitude: r.latitude,
+            longitude: r.longitude,
+          });
         }}
         aria-label={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
         className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-background/90 backdrop-blur transition-colors hover:bg-background"

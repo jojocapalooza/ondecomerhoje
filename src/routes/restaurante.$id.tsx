@@ -1,7 +1,18 @@
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useGetRestaurantPlace, useGetPlaceDetailsById } from "@/lib/data-rpc";
-import { ArrowLeft, CheckCircle2, Clock, Globe, Heart, MapPin, Phone, Star } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  Globe,
+  Heart,
+  Loader2,
+  MapPin,
+  Navigation,
+  Phone,
+  Star,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,29 +20,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useFavorites } from "@/lib/favorites";
 import { formatReviews, priceLabel, ratingColor, restaurants, type Restaurant } from "@/lib/restaurants";
 import {
-  getRestaurantPlace,
-  getPlaceDetailsById,
   cuisinePhoto,
   type PlaceData,
 } from "@/lib/google-places.functions";
 
-const placeQueryOptions = (id: string, r?: Restaurant) =>
-  queryOptions({
-    queryKey: ["place", id],
-    queryFn: () =>
-      r
-        ? getRestaurantPlace({
-            data: { query: `${r.name} ${r.city}`, latitude: r.latitude, longitude: r.longitude },
-          })
-        : getPlaceDetailsById({ data: { placeId: id } }),
-    staleTime: 60 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
-  });
+// A busca dos detalhes acontece sempre no cliente, pelo canal ciente do
+// ambiente (server function no navegador, /api/public/rpc no app Android).
+const placeQueryKey = (id: string) => ["place", id] as const;
 
 export const Route = createFileRoute("/restaurante/$id")({
-  loader: async ({ params, context }) => {
+  loader: async ({ params }) => {
     const r = restaurants.find((x) => x.id === params.id);
-    void context.queryClient.prefetchQuery(placeQueryOptions(params.id, r));
     return { id: params.id, r: r ?? null };
   },
   head: ({ loaderData }) => {
@@ -70,14 +69,17 @@ function Detail() {
   const fav = has(favId);
   const fetchPlace = useGetRestaurantPlace();
   const fetchDetails = useGetPlaceDetailsById();
-  const { data: place } = useSuspenseQuery({
-    ...placeQueryOptions(id, r ?? undefined),
+  const { data: place, isPending, isError } = useQuery<PlaceData | null>({
+    queryKey: placeQueryKey(id),
     queryFn: () =>
       r
         ? fetchPlace({
             data: { query: `${r.name} ${r.city}`, latitude: r.latitude, longitude: r.longitude },
           })
         : fetchDetails({ data: { placeId: id } }),
+    staleTime: 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    retry: 1,
   });
 
   const cuisine = r?.cuisine ?? "Restaurante";
@@ -91,9 +93,30 @@ function Detail() {
   const priceLvl = ((place?.priceLevel ?? r?.priceLevel ?? 2) as 1 | 2 | 3 | 4);
   const displayName = place?.name ?? r?.name ?? "Restaurante";
   const location = place?.location ?? { latitude: r?.latitude ?? 0, longitude: r?.longitude ?? 0 };
-  const mapsUri =
+  const routeUri =
     place?.googleMapsUri ??
     `https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}`;
+  const mapsUri = place?.googleMapsUri
+    ? place.googleMapsUri
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        `${displayName} ${address}`.trim(),
+      )}`;
+
+  function favorite() {
+    toggle({
+      id: favId,
+      name: displayName,
+      cuisine,
+      rating,
+      reviews: reviewsCount,
+      priceLevel: priceLvl,
+      photo: heroPhoto,
+      latitude: location.latitude || undefined,
+      longitude: location.longitude || undefined,
+      address,
+      googleMapsUri: mapsUri,
+    });
+  }
 
   return (
     <article>
@@ -135,17 +158,32 @@ function Detail() {
                   <MapPin className="h-4 w-4" /> {address}
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="icon" onClick={() => toggle(favId)} aria-label="Favoritar">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="icon" onClick={favorite} aria-label={fav ? "Remover dos favoritos" : "Salvar nos favoritos"}>
                   <Heart className={fav ? "fill-destructive text-destructive" : ""} />
                 </Button>
-                <Button asChild>
+                <Button variant="outline" asChild>
                   <a href={mapsUri} target="_blank" rel="noreferrer">
-                    Traçar rota
+                    <MapPin className="h-4 w-4" /> Abrir no Google Maps
+                  </a>
+                </Button>
+                <Button asChild>
+                  <a href={routeUri} target="_blank" rel="noreferrer">
+                    <Navigation className="h-4 w-4" /> Traçar rota
                   </a>
                 </Button>
               </div>
             </div>
+            {isPending && (
+              <p className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando informações do Google Maps…
+              </p>
+            )}
+            {isError && (
+              <p className="mt-4 text-sm text-destructive">
+                Não foi possível carregar os detalhes agora. Você ainda pode abrir o local no Google Maps.
+              </p>
+            )}
           </div>
         </div>
       </div>
