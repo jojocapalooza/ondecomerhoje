@@ -1,22 +1,71 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { isNativeApp } from "./mobile-bridge";
 
-const KEY = "och_favorites";
+// Favoritos guardam um retrato completo do restaurante (não só o id), porque a
+// maioria dos lugares vem do Google Places e não existe no banco local — sem o
+// retrato a tela de Favoritos ficaria sempre vazia.
+const KEY = "och_favorites_v2";
+const LEGACY_KEY = "och_favorites";
 
-function read(): string[] {
+export type FavoriteItem = {
+  id: string;
+  name: string;
+  cuisine: string;
+  rating: number;
+  reviews: number;
+  priceLevel: 1 | 2 | 3 | 4;
+  photo: string;
+  distance?: number;
+  latitude?: number;
+  longitude?: number;
+  address?: string;
+  googleMapsUri?: string;
+  savedAt?: number;
+};
+
+function read(): FavoriteItem[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(localStorage.getItem(KEY) || "[]");
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const v = JSON.parse(raw);
+      return Array.isArray(v) ? (v as FavoriteItem[]).filter((x) => x && typeof x.id === "string") : [];
+    }
+    // migração: versão antiga guardava apenas os ids
+    const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || "[]");
+    if (Array.isArray(legacy) && legacy.length) {
+      return legacy
+        .filter((id: unknown) => typeof id === "string")
+        .map((id: string) => ({
+          id,
+          name: id,
+          cuisine: "Restaurante",
+          rating: 0,
+          reviews: 0,
+          priceLevel: 2 as const,
+          photo: "",
+        }));
+    }
+    return [];
   } catch {
     return [];
   }
 }
 
+function write(items: FavoriteItem[]) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(items));
+  } catch {
+    // armazenamento cheio/bloqueado: mantém apenas em memória nesta sessão
+  }
+  window.dispatchEvent(new Event("favorites-changed"));
+}
+
 export function useFavorites() {
-  const [ids, setIds] = useState<string[]>([]);
+  const [items, setItems] = useState<FavoriteItem[]>([]);
   useEffect(() => {
-    setIds(read());
-    const on = () => setIds(read());
+    setItems(read());
+    const on = () => setItems(read());
     window.addEventListener("storage", on);
     window.addEventListener("favorites-changed", on);
     return () => {
@@ -24,13 +73,22 @@ export function useFavorites() {
       window.removeEventListener("favorites-changed", on);
     };
   }, []);
-  const toggle = useCallback((id: string) => {
+
+  const toggle = useCallback((input: FavoriteItem | string) => {
+    const id = typeof input === "string" ? input : input.id;
     const cur = read();
-    const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
-    localStorage.setItem(KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event("favorites-changed"));
+    const next = cur.some((x) => x.id === id)
+      ? cur.filter((x) => x.id !== id)
+      : typeof input === "string"
+        ? cur
+        : [{ ...input, savedAt: Date.now() }, ...cur];
+    write(next);
   }, []);
-  return { ids, toggle, has: (id: string) => ids.includes(id) };
+
+  const remove = useCallback((id: string) => write(read().filter((x) => x.id !== id)), []);
+
+  const ids = items.map((x) => x.id);
+  return { ids, items, toggle, remove, has: (id: string) => ids.includes(id) };
 }
 
 const SEARCH_KEY = "och_search_history";
