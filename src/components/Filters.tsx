@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,6 +28,11 @@ export function Filters({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<FilterState>(value);
+
+  // Mantém o rascunho em sincronia com os filtros salvos em memória.
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
 
   return (
     <div className="rounded-2xl border border-border bg-card">
