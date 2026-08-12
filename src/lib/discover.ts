@@ -231,8 +231,10 @@ function fiveStarWeight(r: DiscoverItem) {
  */
 function starsScore(r: DiscoverItem) {
   const gapToFive = 5 - r.rating; // 0 = perfeito
-  // A distância quase não pesa: o recorte de raio já garante que é na cidade.
-  return -gapToFive * 10 + fiveStarWeight(r) * 1.4 - Math.min(r.distance, 15) * 0.015;
+  // A nota manda: uma diferença de 0,1 estrela vale mais que qualquer volume.
+  // O volume de 5 estrelas só desempata e a distância quase não pesa (o recorte
+  // de raio já garante que é na cidade).
+  return -gapToFive * 24 + fiveStarWeight(r) * 0.9 - Math.min(r.distance, 15) * 0.01;
 }
 
 /**
