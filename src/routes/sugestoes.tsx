@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Search, SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { RestaurantCard } from "@/components/RestaurantCard";
 import { LocationBar } from "@/components/LocationBar";
 import { useDiscover, sortDiscover, type SortMode } from "@/lib/discover";
 import { pushSearch } from "@/lib/favorites";
+import { readPref, usePersistentState, writePref } from "@/lib/prefs";
 
 type SearchParams = {
   modo: SortMode;
@@ -56,16 +57,50 @@ function Sugestoes() {
   const { modo, q, culinaria } = Route.useSearch();
   const navigate = useNavigate({ from: "/sugestoes" });
   const [term, setTerm] = useState(q ?? "");
-  const [filters, setFilters] = useState<FilterState>(
-    culinaria ? { ...defaultFilters, cuisines: [culinaria] } : defaultFilters,
+  const [filters, setFilters] = usePersistentState<FilterState>(
+    "sugestoes_filters",
+    defaultFilters,
   );
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = usePersistentState("sugestoes_show_filters", false);
   const [visible, setVisible] = useState(12);
+
+  // Restaura a última escolha (ordenação, busca, culinária) quando a tela é
+  // aberta sem parâmetros — ex.: voltando de um restaurante ou pela barra.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    if (typeof window !== "undefined" && window.location.search) return;
+    const saved = readPref<SearchParams>("sugestoes_search");
+    if (saved) {
+      setTerm(saved.q ?? "");
+      navigate({ search: () => saved, replace: true });
+    }
+  }, [navigate]);
+
+  // Guarda a escolha atual em memória local a cada mudança.
+  useEffect(() => {
+    if (restored.current) writePref<SearchParams>("sugestoes_search", { modo, q, culinaria });
+  }, [modo, q, culinaria]);
+
+  // Categoria escolhida na Home entra nos filtros salvos.
+  useEffect(() => {
+    if (!culinaria) return;
+    setFilters((f) => (f.cuisines.includes(culinaria) ? f : { ...f, cuisines: [culinaria] }));
+  }, [culinaria, setFilters]);
+
+  useEffect(() => {
+    setTerm(q ?? "");
+  }, [q]);
 
   const selectedCuisines = useMemo(
     () => (culinaria && !filters.cuisines.length ? [culinaria] : filters.cuisines),
     [culinaria, filters.cuisines],
   );
+
+  useEffect(() => {
+    setVisible(12);
+  }, [modo, q, filters]);
 
   const { geo, city, items, usingRemote, isLoading, error, refetch } = useDiscover({
     query: q ?? "",
