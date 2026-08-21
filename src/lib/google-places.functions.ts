@@ -402,7 +402,7 @@ export const searchNearbyRestaurants = createServerFn({ method: "POST" })
     const [near, popular] = await Promise.all([run("DISTANCE"), run("POPULARITY")]);
     const byId = new Map<string, SearchPlace>();
     for (const p of [...near, ...popular]) if (p.id && !byId.has(p.id)) byId.set(p.id, p);
-    return Promise.all([...byId.values()].map(toNearby));
+    return Promise.all([...byId.values()].filter(isFoodFocusedPlace).map(toNearby));
   });
 
 // Busca por texto (nome/culinária) próximo à localização
@@ -452,7 +452,7 @@ export const searchRestaurantsByText = createServerFn({ method: "POST" })
     const placesById = new Map<string, SearchPlace>();
     const batches = await Promise.all(queries.map((q) => search(q, isAyceSearch ? 8 : 20)));
     for (const place of batches.flat()) {
-      if (!placesById.has(place.id)) placesById.set(place.id, place);
+      if (!placesById.has(place.id) && isFoodFocusedPlace(place)) placesById.set(place.id, place);
     }
 
     const places = Array.from(placesById.values());
