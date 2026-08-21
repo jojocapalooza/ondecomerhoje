@@ -1,91 +1,66 @@
-# Plano: APK 100% independente e sem custos de API para o dono
+# Proteção do backend contra abuso via APK
 
-## Objetivo
-Tornar o aplicativo Android (APK) totalmente independente do backend `ondecomerhoje.lovable.app` para consultas de restaurantes. Todos os dados virão de APIs públicas e gratuitas chamadas diretamente do aparelho do usuário, usando a internet e o GPS dele. O dono do projeto não paga por requisições de API de terceiros.
+## Diagnóstico atual (confirmado no código)
 
-## Arquitetura atual
-- O APK embute HTML/CSS/JS localmente.
-- As buscas de restaurantes, fotos e detalhes passam pelo endpoint `/api/public/rpc` do site publicado.
-- A chave da API do Google Places fica no servidor (segura), mas cada busca gera custo/tráfego no backend do projeto.
+- O endpoint `POST /api/public/rpc` está **totalmente aberto**: CORS `*`, sem autenticação, sem rate limit, sem validação de payload.
+- A URL do site (`https://ondecomerhoje.lovable.app`) está **em texto puro** dentro do APK (`mobile-bridge.ts` vira string legível no JS do app).
+- A chave do Google Places **já está segura**: fica só no servidor (`process.env.GOOGLE_MAPS_API_KEY`), nunca vai para o APK.
+- Risco real hoje: qualquer pessoa que decompilar o APK descobre o endpoint e pode chamá-lo de um script, **gastando sua cota do Google Places** de graça.
 
-## Arquitetura proposta
-- O APK passa a chamar diretamente APIs gratuitas do lado do cliente:
-  - **Overpass API** (OpenStreetMap) para buscar restaurantes por localização e texto.
-  - **Nominatim** (OpenStreetMap) para geocodificação reversa e endereços.
-  - **Google Maps / Waze intents** para abrir rotas no app do usuário, sem custo de API.
-- Fotos reais do Google são substituídas por ilustrações de categoria (já existem no projeto) e, no futuro, por fotos de usuários.
-- O site web pode continuar usando Google Places via backend, ou migrar junto para a mesma fonte gratuita.
+## Verdade importante antes de decidir
 
-## O que será feito
+Não existe forma de esconder 100% uma URL ou segredo dentro de um APK — quem tiver conhecimento técnico suficiente sempre extrai. O objetivo correto é:
 
-### 1. Criar camada de dados gratuita no cliente
-- Novo arquivo `src/lib/osm-places.ts` com funções puramente client-side:
-  - `searchOsmRestaurants(lat, lon, radius, cuisine?)` usando Overpass API.
-  - `reverseGeocodeOsm(lat, lon)` usando Nominatim.
-  - `geocodeAddressOsm(address)` usando Nominatim.
-  - `osmToRestaurant(node/way)` para normalizar os dados no formato `NearbyRestaurant` já usado pela UI.
-- Respeitar os limites de uso das APIs gratuitas:
-  - Nominatim: 1 requisição por segundo, user-agent identificando o app.
-  - Overpass: evitar consultas muito amplas, usar timeout e bounding box razoável.
+1. **Elevar a barreira** — espantar curiosos e scripts copiados (99% dos casos).
+2. **Limitar o dano** — mesmo se descobrirem, o abuso fica caro/lento e você é alertado.
 
-### 2. Adaptar a ponte mobile
-- Em `src/lib/mobile-bridge.ts`, adicionar modo "standalone" para o APK:
-  - Quando ativo, as funções de dados não reescrevem para `/api/public/rpc`.
-  - Em vez disso, `src/lib/data-rpc.ts` passa a usar as funções OSM diretamente no APK.
-- No navegador/site, continuar usando server functions normalmente.
+## Propostas (em camadas, você escolhe até onde ir)
 
-### 3. Substituir fotos do Google por fallbacks de categoria
-- Ajustar `RestaurantCard` e telas de detalhes para:
-  - Tentar foto real vinda do OSM (`photo` tag, Wikimedia Commons) quando disponível.
-  - Caso contrário, usar ilustração de categoria já existente.
-- Remover dependência de `photoUri` do Google no fluxo principal do APK.
+### Camada 1 — Rate limit e validação (essencial, recomendo sempre)
 
-### 4. Ajustar busca textual e filtros
-- Mapear categorias do app (Vegan, Pet-friendly, Brunch, Rodízio etc.) para tags e palavras-chave do OpenStreetMap.
-- Implementar busca por pratos específicos usando tags de culinária + palavras-chave no nome/descrição.
-- Reforçar filtro anti-não-restaurante (remover fábricas, hotéis, boates etc.) usando tags OSM.
+- Limitar o endpoint RPC por IP: ex. **30 requisições/minuto e 500/dia por IP**, respondendo HTTP 429 acima disso.
+- Validar o payload com Zod (nomes de função permitidos, tipos e limites: raio máximo de busca, tamanho da query, coordenadas válidas). Hoje qualquer JSON é encaminhado.
+- Erros genéricos para o cliente (sem vazar mensagens internas do Google no corpo da resposta).
+- **Custo: zero. Efeito: ninguém consegue varrer o Google Places inteiro pelo seu endpoint.**
 
-### 5. Melhorar lógica de proximidade e Trends
-- Manter geolocalização nativa do aparelho.
-- Ordenar resultados por distância e nota, com raio configurável.
-- Na tela Trends, usar Overpass para buscar cidades próximas e restaurantes em cada uma, tudo do lado do cliente.
+### Camada 2 — Assinatura de requisições do app (proteção forte)
 
-### 6. Abrir rotas no app do usuário
-- Substituir links de "Abrir no Google Maps" por intents nativos que abrem o Google Maps/Waze instalado no celular.
-- Isso não consome API key e usa os dados/offline do app do usuário.
+- O APK passa a assinar cada chamada com **HMAC + timestamp** usando um segredo embutido no build (ofuscado, ver Camada 3).
+- O servidor recusa chamadas sem assinatura válida ou com timestamp fora de uma janela de 5 minutos (bloqueia replay e scripts simples que copiaram só a URL).
+- **Honestidade:** quem decompilar a fundo ainda extrai o segredo — mas precisa entender de criptografia e reengenharia, o que elimina a esmagadora maioria dos abusos. Combinado com a Camada 1, o dano possível fica pequeno.
 
-### 7. Cache local
-- Salvar últimos resultados de busca e detalhes no `localStorage` do WebView para reabrir rápido.
-- Favoritos continuam no dispositivo.
+### Camada 3 — Dificultar a descoberta da URL no APK
 
-### 8. Remover ou tornar opcional o endpoint `/api/public/rpc`
-- Se o site web continuar usando Google Places, manter o endpoint apenas para web.
-- No APK, desativar a ponte para o endpoint, eliminando tráfego no domínio publicado.
+- Montar a URL da API em runtime a partir de partes codificadas (nunca como string legível no bundle).
+- Build mobile com minificação agressiva e **sem sourcemaps** dentro do APK (verificar o pipeline atual).
+- Trocar o path `/api/public/rpc` por algo neutro (ex.: `/api/public/gw`). Não é segurança de verdade, só reduz exposição óbvia.
 
-## Impactos esperados
-| Aspecto | Antes | Depois |
+### Camada 4 — Contenção de dano no Google Cloud (você faz no console, 10 min)
+
+- Definir **cota diária máxima** e **alertas de faturamento** na chave do Google Places — se houver abuso, a cota estoura e o gasto para, em vez de virar surpresa na fatura.
+- Ativar alerta de uso anômalo.
+
+### Não recomendo (falsa sensação de segurança)
+
+- Restringir CORS: CORS só vale para navegadores; scripts e curl ignoram. Não protege nada aqui.
+- Só "esconder a URL": sem rate limit e assinatura, é questão de minutos para achar.
+
+### Próximo nível (futuro, se o app crescer)
+
+- **Google Play Integrity / App Check**: o servidor só responde a instalações genuínas do app. É o padrão da indústria, mas exige publicação/configuração no Google Play e mais complexidade. Deixar para quando houver distribuição na Play Store.
+
+## Resumo do que mudaria no código (apenas se aprovar)
+
+| Item | Onde | Esforço |
 |---|---|---|
-| Custo de API Google | No servidor do projeto | Zero para o dono |
-| Dados do usuário | Pago pelo projeto | Pago pelo usuário com seu plano de internet |
-| Segurança da API Key | Boa (no servidor) | Excelente (não há chave no APK) |
-| Riqueza dos dados | Alta (Google Places) | Média (OSM), suficiente para nome, endereço, tipo e coordenadas |
-| Fotos | Reais do Google | Ilustrações de categoria + Wikimedia quando disponível |
-| Dependência do site | Sim, para dados | Apenas para atualizações do app |
-| Funciona sem internet | Não | Parcialmente, com cache local |
+| Rate limit por IP + 429 | `src/routes/api/public/rpc.ts` | Baixo |
+| Validação Zod do payload | `src/routes/api/public/rpc.ts` | Baixo |
+| Assinatura HMAC app→servidor | `rpc.ts` + `data-rpc.ts` + segredo no build mobile | Médio |
+| Ofuscação da URL + build sem sourcemap | `mobile-bridge.ts` + workflow do APK | Baixo |
+| Cota e alertas no Google Cloud | Console do Google (manual, você) | 10 min |
 
-## Riscos e mitigações
-- **Qualidade dos dados OSM**: em regiões pouco mapeadas pode trazer menos resultados. Mitigação: ampliar raio e usar múltiplas fontes de tags.
-- **Rate limits**: Nominatim e Overpass têm limites. Mitigação: cache, debounce e user-agent correto.
-- **Fotos**: perda de fotos reais. Mitigação: ilustrações de categoria e futura opção de upload por usuários.
+## Minha recomendação
 
-## Entregáveis
-1. `src/lib/osm-places.ts` — nova camada de dados gratuita.
-2. `src/lib/mobile-bridge.ts` — modo standalone para APK.
-3. Ajustes em `src/lib/data-rpc.ts` para usar OSM no APK.
-4. Ajustes nos componentes de card e detalhes para fotos de categoria.
-5. Atualização da tela Trends para usar OSM.
-6. Novo workflow de build Android sem dependência de `VITE_MOBILE_API_BASE`.
-7. Documento `APK-INDEPENDENTE.md` explicando a nova arquitetura e como gerar o APK.
+Aplicar **Camadas 1 + 3 agora** (custo zero, resolve o abuso casual) e deixar a **Camada 2** como decisão sua — ela dá a proteção forte, mas adiciona complexidade ao build do APK. A Camada 4 é independente e vale fazer de qualquer jeito.
 
-## Próximos passos
-Aprovar este plano para começar a implementação da camada OSM e da ponte standalone.
+Me diga quais camadas aprovar que eu aplico sobre o modelo atual, sem mudar nada da arquitetura híbrida.
