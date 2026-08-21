@@ -290,7 +290,7 @@ function Trend() {
         <div>
           <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
             <MapPin className="h-3.5 w-3.5" />
-            {city?.detected ? "Metrópole detectada" : "Metrópole"}
+            {city?.detected ? "Sua cidade" : "Cidade vizinha"}
           </div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">
             {activeMode.emoji} {activeMode.label} em {city?.name ?? "sua região"}
@@ -362,7 +362,7 @@ function Trend() {
         </div>
       ) : list.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground">
-          Sem resultados para este modo em {city?.name}. Tente outro filtro ou outra metrópole próxima.
+          Sem resultados para este modo em {city?.name}. Tente outro filtro ou uma cidade vizinha acima.
         </div>
       ) : (
         <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
