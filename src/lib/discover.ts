@@ -38,10 +38,14 @@ export function useDiscover({
   query = "",
   cuisines = [],
   geo: externalGeo,
+  radiusKm = 5,
 }: {
   query?: string;
   cuisines?: string[];
   geo?: UseUserLocation;
+  /** Raio da busca nearby. Modos de "melhores" usam raio maior para
+   *  encontrar lugares melhores mesmo que mais distantes. */
+  radiusKm?: number;
 } = {}) {
   const ownGeo = useUserLocation();
   const geo = externalGeo ?? ownGeo;
@@ -76,10 +80,15 @@ export function useDiscover({
   }, [query, specialSelected]);
 
   const nearbyQuery = useQuery({
-    queryKey: ["nearby", userLoc?.lat, userLoc?.lng, regionCode],
+    queryKey: ["nearby", userLoc?.lat, userLoc?.lng, regionCode, radiusKm],
     queryFn: () =>
       fetchNearby({
-        data: { latitude: userLoc!.lat, longitude: userLoc!.lng, radius: 5000, regionCode },
+        data: {
+          latitude: userLoc!.lat,
+          longitude: userLoc!.lng,
+          radius: Math.round(radiusKm * 1000),
+          regionCode,
+        },
       }),
     enabled: !!userLoc && !effectiveQuery,
     staleTime: 5 * 60 * 1000,
