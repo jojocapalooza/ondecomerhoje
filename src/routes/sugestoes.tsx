@@ -24,6 +24,17 @@ const MODES: [SortMode, string][] = [
   ["near", "Mais Próximos"],
 ];
 
+// Raio de busca por modo: rankings de "melhores" olham a cidade/região toda
+// (valem lugares mais distantes se forem melhores); "Mais Próximos" fica no
+// bairro/redondeza.
+const RADIUS_KM_BY_MODE: Record<SortMode, number> = {
+  stars: 15,
+  best: 12,
+  reviews: 10,
+  near: 5,
+  new: 8,
+};
+
 export const Route = createFileRoute("/sugestoes")({
   validateSearch: (search: Record<string, unknown>): SearchParams => ({
     modo: (["near", "best", "stars", "reviews"].includes(String(search.modo))
@@ -105,6 +116,7 @@ function Sugestoes() {
   const { geo, city, items, usingRemote, isLoading, error, refetch } = useDiscover({
     query: q ?? "",
     cuisines: selectedCuisines,
+    radiusKm: RADIUS_KM_BY_MODE[modo],
   });
 
   const list = useMemo(() => {

@@ -170,15 +170,55 @@ const NON_FOOD_PRIMARY_TYPES = new Set([
   "convenience_store",
   "liquor_store",
   "gas_station",
+  // indústria / atacado / fabricação (ex.: "Fabricante de alimentos")
+  "food_manufacturer",
+  "manufacturer",
+  "wholesaler",
+  "warehouse",
+  "storage",
+  "distribution_center",
+  "corporate_office",
+  "farm",
+  "ranch",
 ]);
 
-// Segurança extra quando o tipo primário vem vazio: o nome denuncia o foco.
+// Tipos que o Google reconhece claramente como "lugar de comer". Quando o
+// primaryType é um desses, confiamos nele; fora isso, o nome decide.
+const TRUSTED_FOOD_TYPES = new Set([
+  ...Object.keys(CUISINE_MAP),
+  "restaurant",
+  "bar_and_grill",
+  "meal_delivery",
+  "meal_takeaway",
+  "diner",
+  "food_court",
+  "ice_cream_shop",
+  "juice_shop",
+  "coffee_shop",
+  "tea_house",
+  "wine_bar",
+  "pub",
+  "brewery",
+  "cafeteria",
+  "deli",
+  "dessert_shop",
+  "donut_shop",
+  "candy_store",
+  "chocolate_shop",
+  "sandwich_shop",
+  "food_store",
+]);
+
+// Segurança extra: quando o tipo não é claramente de alimentação, o nome
+// denuncia o foco (boate, motel, fábrica, indústria, atacado…).
 const NON_FOOD_NAME_RE =
-  /\b(boate|boite|casa\s+noturna|night\s?clubs?|strip\s?clubs?|mot[ée]l|hostel|albergue)\b/i;
+  /\b(boate|boite|casa\s+noturna|night\s?clubs?|strip\s?clubs?|mot[ée]l|hostel|albergue|f[áa]brica|fabricante|ind[úu]strias?|distribuidor[ao]?|atacad(?:o|ista)|dep[óo]sito|cooperativa|slaughterhouse|frigor[íi]fico)\b/i;
 
 function isFoodFocusedPlace(p: SearchPlace) {
   if (p.primaryType && NON_FOOD_PRIMARY_TYPES.has(p.primaryType)) return false;
-  if (!p.primaryType && p.displayName?.text && NON_FOOD_NAME_RE.test(p.displayName.text)) {
+  if (p.types?.some((t) => NON_FOOD_PRIMARY_TYPES.has(t)) && !p.primaryType) return false;
+  const trusted = !!p.primaryType && TRUSTED_FOOD_TYPES.has(p.primaryType);
+  if (!trusted && p.displayName?.text && NON_FOOD_NAME_RE.test(p.displayName.text)) {
     return false;
   }
   return true;

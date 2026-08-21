@@ -73,15 +73,17 @@ function Home() {
   const [listening, setListening] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { geo, city, items, isLoading, usingRemote } = useDiscover();
+  // Raio de 15 km: as "Sugestões para você" devem cobrir a cidade/região, não
+  // só a redondeza — um lugar melhor um pouco mais longe vale a recomendação.
+  const { geo, city, items, isLoading, usingRemote } = useDiscover({ radiusKm: 15 });
 
   useEffect(() => setHistory(getSearchHistory()), []);
 
-  // "Sugestões para você": os melhores da cidade (nota mais próxima de 5 com
-  // maior volume de 5 estrelas) dentro de um raio de até 5 km, com viés pelo
-  // histórico de busca quando ele existe.
+  // "Sugestões para você": os melhores da cidade/região (nota mais próxima de
+  // 5 com maior volume de 5 estrelas) num raio de até 15 km — a nota manda e a
+  // distância só desempata. Viés pelo histórico de busca quando ele existe.
   const top = useMemo(() => {
-    const inCity = items.filter((r) => r.distance <= 5);
+    const inCity = items.filter((r) => r.distance <= 15);
     const scored = sortDiscover(inCity.length >= 3 ? inCity : items, "stars");
     const terms = history.map((h) => h.toLowerCase().trim()).filter(Boolean);
     if (!terms.length) return scored.slice(0, 5);
