@@ -5,9 +5,24 @@
 // Aqui reescrevemos apenas essas chamadas de dados para a origem publicada.
 // Todo o resto (HTML, JS, CSS, imagens) continua vindo de dentro do aparelho.
 
+// A URL padrão da API fica codificada e em pedaços: quem abrir o APK e
+// procurar por "https://" ou pelo domínio nas strings do bundle não a encontra
+// diretamente. Não é segurança absoluta (nada embutido no APK é), mas eleva a
+// barreira contra extração casual — a proteção real está no rate limit e na
+// validação do endpoint.
+const DEFAULT_API_BASE_PARTS = ["aHR0cHM6Ly9v", "bmRlY29tZXJob2pl", "LmxvdmFibGUuYXBw"];
+
+function defaultApiBase(): string {
+  try {
+    return atob(DEFAULT_API_BASE_PARTS.join(""));
+  } catch {
+    return "";
+  }
+}
+
 export const MOBILE_API_BASE =
   (import.meta.env["VITE_MOBILE_API_BASE"] as string | undefined)?.replace(/\/$/, "") ||
-  "https://ondecomerhoje.lovable.app";
+  defaultApiBase();
 
 export function isNativeApp(): boolean {
   if (typeof window === "undefined") return false;
