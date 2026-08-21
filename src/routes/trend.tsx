@@ -5,10 +5,6 @@ import { useReverseGeocode, useSearchNearbyRestaurants } from "@/lib/data-rpc";
 import { MapPin, Flame, Gem, Trophy, Navigation, Clock } from "lucide-react";
 import { RestaurantCard } from "@/components/RestaurantCard";
 import { useUserLocation, haversineKm } from "@/lib/favorites";
-import {
-  searchNearbyRestaurants,
-  reverseGeocode,
-} from "@/lib/google-places.functions";
 
 type City = {
   name: string;
@@ -140,38 +136,42 @@ function Trend() {
   // País do usuário; fallback Brasil quando não há geo.
   const userCountry = geoQuery.data?.countryCode ?? "BR";
 
-  // Metrópole detectada = cidade do reverse geocode SE ela é uma metrópole conhecida,
-  // caso contrário a metrópole mais próxima do mesmo país.
+  // Cidade principal = a cidade REAL do usuário (do reverse geocode), mesmo
+  // que não seja metrópole. As demais opções são apenas cidades AO REDOR
+  // (mesmo país, até ~150 km) — nunca cidades aleatórias de longe.
   const cities: City[] = useMemo(() => {
     const sameCountry = METROPOLISES.filter((c) => c.country === userCountry);
-    const pool = sameCountry.length > 0 ? sameCountry : METROPOLISES;
+    const detectedName = geoQuery.data?.city;
 
     let detected: City | null = null;
     if (loc) {
-      const nearest = [...pool].sort(
-        (a, b) =>
-          haversineKm(loc, { lat: a.lat, lng: a.lng }) -
-          haversineKm(loc, { lat: b.lat, lng: b.lng }),
-      )[0];
-      const detectedName = geoQuery.data?.city;
       const matchByName = detectedName
-        ? pool.find((c) => c.name.toLowerCase() === detectedName.toLowerCase())
+        ? sameCountry.find((c) => c.name.toLowerCase() === detectedName.toLowerCase())
         : null;
-      detected = { ...(matchByName ?? nearest), detected: true };
+      detected = matchByName
+        ? { ...matchByName, detected: true }
+        : {
+            name: detectedName ?? "Sua cidade",
+            lat: loc.lat,
+            lng: loc.lng,
+            country: userCountry,
+            population: 0,
+            detected: true,
+          };
     }
 
-    const rest = pool
-      .filter((c) => c.name !== detected?.name)
-      .sort((a, b) => {
-        if (loc) {
-          return (
-            haversineKm(loc, { lat: a.lat, lng: a.lng }) -
-            haversineKm(loc, { lat: b.lat, lng: b.lng })
-          );
-        }
-        return b.population - a.population;
-      })
-      .slice(0, 7);
+    const AROUND_KM = 150;
+    const rest = loc
+      ? sameCountry
+          .filter((c) => c.name !== detected?.name)
+          .map((c) => ({ c, d: haversineKm(loc, { lat: c.lat, lng: c.lng }) }))
+          .filter((x) => x.d <= AROUND_KM)
+          .sort((a, b) => a.d - b.d)
+          .slice(0, 5)
+          .map((x) => x.c)
+      : (sameCountry.length > 0 ? sameCountry : METROPOLISES)
+          .sort((a, b) => b.population - a.population)
+          .slice(0, 6);
     return detected ? [detected, ...rest] : rest;
   }, [loc, geoQuery.data?.city, userCountry]);
 
@@ -290,7 +290,7 @@ function Trend() {
         <div>
           <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
             <MapPin className="h-3.5 w-3.5" />
-            {city?.detected ? "Metrópole detectada" : "Metrópole"}
+            {city?.detected ? "Sua cidade" : "Cidade vizinha"}
           </div>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">
             {activeMode.emoji} {activeMode.label} em {city?.name ?? "sua região"}
@@ -362,7 +362,7 @@ function Trend() {
         </div>
       ) : list.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground">
-          Sem resultados para este modo em {city?.name}. Tente outro filtro ou outra metrópole próxima.
+          Sem resultados para este modo em {city?.name}. Tente outro filtro ou uma cidade vizinha acima.
         </div>
       ) : (
         <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
