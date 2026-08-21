@@ -122,6 +122,68 @@ function mapCuisine(primaryType?: string, displayName?: string) {
   return "Restaurante";
 }
 
+// O app é sobre ONDE COMER. O Google às vezes devolve, junto aos
+// restaurantes, lugares cujo foco principal é outro (casa noturna, hotel,
+// cassino, evento) só porque "também servem comida". Se o negócio principal
+// não é alimentação, o lugar fica de fora — o restaurante dentro de um hotel
+// aparece como um lugar próprio, nunca como o hotel.
+const NON_FOOD_PRIMARY_TYPES = new Set([
+  // vida noturna
+  "night_club",
+  "dance_club",
+  "comedy_club",
+  "karaoke",
+  "adult_entertainment",
+  // hospedagem
+  "lodging",
+  "hotel",
+  "motel",
+  "resort_hotel",
+  "bed_and_breakfast",
+  "hostel",
+  "inn",
+  "campground",
+  "rv_park",
+  // entretenimento / eventos
+  "casino",
+  "event_venue",
+  "banquet_hall",
+  "wedding_venue",
+  "convention_center",
+  "concert_hall",
+  "performing_arts_theater",
+  "movie_theater",
+  "bowling_alley",
+  "amusement_park",
+  "amusement_center",
+  "stadium",
+  "golf_course",
+  "marina",
+  "spa",
+  "gym",
+  "fitness_center",
+  // comércio não-restaurante
+  "shopping_mall",
+  "department_store",
+  "supermarket",
+  "grocery_or_supermarket",
+  "convenience_store",
+  "liquor_store",
+  "gas_station",
+]);
+
+// Segurança extra quando o tipo primário vem vazio: o nome denuncia o foco.
+const NON_FOOD_NAME_RE =
+  /\b(boate|boite|casa\s+noturna|night\s?clubs?|strip\s?clubs?|mot[ée]l|hostel|albergue)\b/i;
+
+function isFoodFocusedPlace(p: SearchPlace) {
+  if (p.primaryType && NON_FOOD_PRIMARY_TYPES.has(p.primaryType)) return false;
+  if (!p.primaryType && p.displayName?.text && NON_FOOD_NAME_RE.test(p.displayName.text)) {
+    return false;
+  }
+  return true;
+}
+
 async function gatewayFetch(path: string, init: RequestInit = {}) {
   const lovableKey = process.env.LOVABLE_API_KEY;
   const connectionKey = process.env.GOOGLE_MAPS_API_KEY;
